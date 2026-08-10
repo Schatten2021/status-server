@@ -12,6 +12,7 @@ const fn hourly() -> chrono::Duration { chrono::Duration::hours(1) }
 pub struct Config {
     url: String,
     #[serde(default="hourly")]
+    #[serde(with="utils::duration_parsing")]
     interval: chrono::Duration,
     #[serde(default)]
     status: SingleFilter<u16>,

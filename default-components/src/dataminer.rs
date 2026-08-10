@@ -9,6 +9,7 @@ const LAST_SEEN_ID: &str = "miner.last_seen";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct Config {
+    #[serde(with="utils::duration_parsing")]
     timeout: chrono::Duration,
 }
 

@@ -13,6 +13,7 @@ pub struct JavaConfig {
     #[serde(default="java_default_port")]
     pub port: u16,
     #[serde(default="default_timeout")]
+    #[serde(with="utils::duration_parsing")]
     pub interval: chrono::Duration,
 }
 const fn java_default_port() -> u16 {

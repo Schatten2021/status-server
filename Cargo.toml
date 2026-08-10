@@ -50,15 +50,15 @@ members = ["api-types","default-components", "frontend","server"]
 resolver = "3"
 
 [workspace.dependencies]
+utils = { version = "0.5", registry = "kellnr", features = ["never"] }
+default-components = { path = "default-components" }
+api-types = { path = "api-types" }
 tracing = "0.1"
 axum = "0.8"
 tokio = { version = "1.53", features = ["signal"] }
 serde = { version = "1", features = ["derive"] }
-utils = { version = "0.4", registry = "kellnr", features = ["never"] }
 parking_lot = "0.12"
 chrono = "0.4"
 toml = "1.1"
 server = { path = "server" }
 async-trait = "0.1"
-default-components = { path = "default-components" }
-api-types = { path = "api-types" }

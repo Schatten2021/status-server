@@ -31,7 +31,7 @@ default = ["all-status", "all-notifications"]
 [dependencies]
 # used in basically every scenario
 tracing.workspace = true # debugging/logging
-utils.workspace = true # utilities
+utils = { workspace = true, features = ["duration-parsing"] } # utilities
 serde.workspace = true # config
 server.workspace = true
 
