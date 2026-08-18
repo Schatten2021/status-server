@@ -94,7 +94,7 @@ fn read_config(path: impl AsRef<Path>) -> Config {
 // component management
 impl Server {
     pub(crate) fn add_notification_provider_dependency<P: NotificationProvider>(&mut self, dependant: TypeId) {
-        if self.loaded_config.ignored.components.contains(P::ID) {
+        if self.loaded_config.global.ignored.components.contains(P::ID) {
             error!("dependency {} cannot be satisfied as it is set to be ignored.", P::ID);
             return;
         }
@@ -109,7 +109,7 @@ impl Server {
             .expect("just inserted it").notification_provider_info = Some(info);
     }
     pub(crate) fn add_component_dependency<C: Component>(&mut self, dependant: TypeId) {
-        if self.loaded_config.ignored.components.contains(C::ID) {
+        if self.loaded_config.global.ignored.components.contains(C::ID) {
             error!("dependency {} cannot be satisfied as it is set to be ignored.", C::ID);
             return;
         }
@@ -121,7 +121,7 @@ impl Server {
             .required_by.insert(dependant);
     }
     pub(crate) fn add_notification_provider<P: NotificationProvider>(&mut self, provider: P) {
-        if self.loaded_config.ignored.components.contains(P::ID) { return; }
+        if self.loaded_config.global.ignored.components.contains(P::ID) { return; }
         self.add_component::<P>(provider);
         let info = NotificationProviderInfo {
             notify: notify_provider::<P>
@@ -130,7 +130,7 @@ impl Server {
             .expect("just inserted it").notification_provider_info = Some(info);
     }
     pub(crate) fn add_component<C: Component>(&mut self, component: C) {
-        if self.loaded_config.ignored.components.contains(C::ID) { return; }
+        if self.loaded_config.global.ignored.components.contains(C::ID) { return; }
         
         if self.components.contains_key::<C>() {
             debug!("called `add_component` with already registered component! Ignoring.");
@@ -184,7 +184,7 @@ impl Server {
         Some(C::Config::deserialize(conf.clone()))
     }
     pub(crate) fn ignored<C: Component>(&self) -> bool {
-        self.loaded_config.ignored.components.contains(C::ID)
+        self.loaded_config.global.ignored.components.contains(C::ID)
     }
 }
 impl Server {
@@ -201,7 +201,7 @@ impl Server {
         self.loaded_config = read_config(&self.config_path);
         for to_remove in self.components.entries_mut()
             .filter_map(|(data, component)| {
-                if self.loaded_config.ignored.components.contains(data.id) {
+                if self.loaded_config.global.ignored.components.contains(data.id) {
                     return Some(data.type_id);
                 }
                 let config = self.loaded_config.configs.get(data.id).cloned();

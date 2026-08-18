@@ -37,13 +37,16 @@ These are mainly:
 - `-h`: prints the help
 - `-V`: prints the version
 
-Any further configuration is done inside of the `config.toml` (or whichever toml file you passed to `-c`).
+Any further configuration is done inside the `config.toml` (or whichever toml file you passed to `-c`).
+
+"Global" Configuration (i.e. ignored components) are in the `global` key for the config. 
+(i.e. `global.ignored.components`)
 
 On Unix platforms you can send `SIGUSR1` signal to the program to trigger a reload of the configuration file.
 
 ## Components
 you can enable and disable [Components](#component) (works at runtime) by putting their ids in the `ignored.components` 
-config field.
+global config field (so `global.ignored.components`).
 
 **WARNING!**: Ignoring a dependency of another [Component](#component) will not allow that dependency to be added to the 
 server, even if that breaks other [Component](#component). Deleting a [Component](#component) by removing it and 

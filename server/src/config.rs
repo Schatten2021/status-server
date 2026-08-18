@@ -6,7 +6,15 @@ pub struct Config {
     #[serde(flatten)]
     /// Map of all the configs for the different [`crate::Component`]s.
     pub configs: HashMap<String, toml::Value>,
+    
+    /// The global configuration for the server.
+    /// 
+    /// This its own subsection to make sure it doesn't interfere with other components.
+    pub global: Global,
+}
 
+#[derive(Clone, Debug, Default, serde::Deserialize, serde::Serialize)]
+pub struct Global {
     #[serde(alias="ignore", alias="disabled", alias="disable")]
     #[serde(default)]
     /// The things that the server ignores completely.

@@ -21,7 +21,7 @@ pub fn check(path_: &PathBuf) -> Result<(), ()> {
                     }
                     Err(e) => {
                         error!("Invalid config for `{}`: {e}", ::default_components::$component::ID);
-                        ok &= !toml.ignored.components.contains(::default_components::$component::ID);
+                        ok &= !toml.global.ignored.components.contains(::default_components::$component::ID);
                     }
                 }
             } else {
