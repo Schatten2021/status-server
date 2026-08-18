@@ -5,7 +5,7 @@ use api_types::{ApiResponse, ServerError};
 use server::ComponentHandle;
 use crate::filters::{AttributeIdMatcher, SingleFilter};
 
-fn default_path() -> String { "api/".to_string() }
+fn default_path() -> String { "/api/".to_string() }
 
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -15,12 +15,14 @@ pub struct Config {
 
     #[serde(default)]
     #[serde(alias="attribute-filter",
-        alias="filter_attribute", alias="filter_attributes", alias="filter-attribute", alias="filter-attributes")]
+        alias="filter_attribute", alias="filter_attributes", alias="filter-attribute", alias="filter-attributes",
+        alias="attribute", alias="attributes")]
     attribute_filter: SingleFilter<AttributeIdMatcher>,
 
     #[serde(default)]
     #[serde(alias="element-filter",
-        alias="filter_element", alias="filter_elements", alias="filter-element", alias="filter-elements")]
+        alias="filter_element", alias="filter_elements", alias="filter-element", alias="filter-elements",
+        alias="element", alias="elements")]
     element_filter: SingleFilter<String>,
 }
 impl Default for Config {
@@ -163,4 +165,45 @@ impl server::Component for Api {
                 .expect("some argument failed to parse?")
         }))
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::parse_test;
+
+    parse_test!(parse_empty(Config): toml::Table::new() => Config {
+        path: "/api/".to_string(),
+        attribute_filter: Default::default(),
+        element_filter: Default::default(),
+    });
+    parse_test!(with_path(Config): toml!{path = "/legacy/api"} => Config {
+        path: "/legacy/api".to_string(),
+        attribute_filter: Default::default(),
+        element_filter: Default::default(),
+    });
+    parse_test!(attribute_filter(Config): toml!{attributes.allow = [{ id="test" }, { id="foo.bar", exact=false }]} => Config {
+        path: "/api/".to_string(),
+        attribute_filter: SingleFilter {
+            whitelist: vec![
+                AttributeIdMatcher { id: "test".to_string(), exact: true },
+                AttributeIdMatcher { id: "foo.bar".to_string(), exact: false }
+            ],
+            blacklist: vec![],
+            priority: Default::default(),
+        },
+        element_filter: Default::default(),
+    });
+    parse_test!(element_filter(Config): toml!{elements.deny = ["foo", "bar"]} => Config {
+        path: "/api/".to_string(),
+        attribute_filter: SingleFilter::default(),
+        element_filter: SingleFilter {
+            whitelist: vec![],
+            blacklist: vec![
+                "foo".to_string(),
+                "bar".to_string(),
+            ],
+            priority: Default::default(),
+        }
+    });
 }

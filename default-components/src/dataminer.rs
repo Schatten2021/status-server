@@ -117,3 +117,19 @@ impl Drop for DataminerStatus {
             .for_each(|h| h.abort());
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{parse_test, Status};
+    parse_test!(empty(<DataminerStatus as Component>::Config): toml::Table::new() => error);
+    parse_test!(parse(<DataminerStatus as Component>::Config): toml!{
+        [status.foo]
+        timeout = "100s"
+        [status.bar]
+        timeout = "6h"
+    } => Status::new(HashMap::from([
+        ("foo".to_string(), Config { timeout: chrono::Duration::seconds(100) }),
+        ("bar".to_string(), Config { timeout: chrono::Duration::hours(6) }),
+    ])));
+}

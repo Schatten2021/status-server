@@ -3,23 +3,23 @@ use tokio::time::MissedTickBehavior;
 use utils::Never;
 use server::{AttributeValue, Component, ComponentHandle};
 
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Config {
     pub java: HashMap<String, JavaConfig>,
 }
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct JavaConfig {
     pub url: String,
     #[serde(default="java_default_port")]
     pub port: u16,
-    #[serde(default="default_timeout")]
+    #[serde(default="hourly")]
     #[serde(with="utils::duration_parsing")]
     pub interval: chrono::Duration,
 }
 const fn java_default_port() -> u16 {
     25565
 }
-const fn default_timeout() -> chrono::Duration {
+const fn hourly() -> chrono::Duration {
     chrono::Duration::hours(1)
 }
 /// [`Component`] to allow keeping track of minecraft servers.
@@ -192,4 +192,35 @@ struct StatusResponsePlayers {
 struct StatusResponsePlayerSample {
     name: String,
     id: String,
+}
+
+#[cfg(test)]
+mod test {
+    use crate::config_wrappers::Status;
+    use super::*;
+    use crate::parse_test;
+    parse_test!(empty(<MinecraftStatus as Component>::Config): toml::Table::new() => error);
+    parse_test!(parse(<MinecraftStatus as Component>::Config): toml!{
+        [status.java.foo]
+        url = "foo.example"
+
+        [status.java.bar]
+        url = "bar.example"
+        port = 42
+        interval = "5h"
+
+    } => Status::new(Config {
+        java: HashMap::from([
+            ("foo".to_string(), JavaConfig {
+                url: "foo.example".to_string(),
+                port: java_default_port(),
+                interval: hourly(),
+            }),
+            ("bar".to_string(), JavaConfig {
+                url: "bar.example".to_string(),
+                port: 42,
+                interval: chrono::Duration::hours(5)
+            })
+        ])
+    }));
 }

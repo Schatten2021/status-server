@@ -255,7 +255,7 @@ impl Server {
                 self.notify(Notification::new(
                     component_id.to_string(),
                     element_id.to_string(),
-                    NotificationReason::DeleteAttribute(attribute_id.to_string(), old))
+                    NotificationReason::AttributeDeleted(attribute_id.to_string(), old))
                 );
             }
             return;
@@ -274,7 +274,7 @@ impl Server {
             .for_each(|(id, old)| self.notify(Notification::new(
                 component_id.to_string(),
                 element_id.to_string(),
-                NotificationReason::DeleteAttribute(id, old))
+                NotificationReason::AttributeDeleted(id, old))
             ));
     }
     pub(crate) fn online_status_changed(&mut self, component_id: &'static str, element_id: &str, new_status: bool) {

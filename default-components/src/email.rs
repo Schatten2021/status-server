@@ -14,6 +14,7 @@ pub struct Config {
     name: String,
     #[serde(alias="subscribed", alias="notify", alias="alert")]
     subscribers: Vec<Subscriber>,
+    #[serde(default)]
     filter: Filter,
 }
 impl Default for Config {
@@ -102,7 +103,7 @@ impl NotificationProvider for EmailNotificationProvider {
                 format!("{id} of {} just changed value", notification.element_id),
                 format!("{id} of {} just changed from {old} to {new}", notification.element_id)
             ),
-            NotificationReason::DeleteAttribute(id, val) => (
+            NotificationReason::AttributeDeleted(id, val) => (
                 format!("{id} of {} just got deleted", notification.element_id),
                 format!("{id} of {} just got deleted ({val})", notification.element_id)
             ),
@@ -145,5 +146,119 @@ impl EmailNotificationProvider {
                 .body(body.to_string())?)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::Notification;
+    mod parsing {
+        use crate::filters::{FilterPriority, OnlineStateChange, SingleFilter, StateChange};
+        use super::*;
+        use crate::parse_test;
+        parse_test!(empty(<EmailNotificationProvider as Component>::Config): toml::Table::new() => error);
+        parse_test!(minimal(<EmailNotificationProvider as Component>::Config): toml!{
+            [notify]
+            address = "noreply@example.com"
+            password = "Password123"
+            server = "example.com"
+            notify = []
+        } => Notification::new(Config {
+            address: "noreply@example.com".to_string(),
+            password: "Password123".to_string(),
+            server: "example.com".to_string(),
+            name: "No Reply".to_string(),
+            subscribers: vec![],
+            filter: Filter::default(),
+        }));
+        parse_test!(maximal(<EmailNotificationProvider as Component>::Config): toml!{
+            [notify]
+            address = "noreply@example.com"
+            password = "Password123"
+            server = "example.com"
+            name = "foo"
+            subscribers = [
+                "foo@example.com",
+                { to = "bar@example.com" },
+                { mail="test@example.com", filter.elements.deny = ["bar"] },
+            ]
+            filter.state.mode = "explicit-whitelist"
+            filter.state.allow = [ { online = "down" } ]
+        } => Notification::new(Config {
+            address: "noreply@example.com".to_string(),
+            password: "Password123".to_string(),
+            server: "example.com".to_string(),
+            name: "foo".to_string(),
+            subscribers: vec![
+                Subscriber::Default("foo@example.com".to_string()),
+                Subscriber::Custom { email: "bar@example.com".to_string(), filter: Filter::default() },
+                Subscriber::Custom {
+                    email: "test@example.com".to_string(),
+                    filter: Filter {
+                        component: Default::default(),
+                        entity: SingleFilter {
+                            whitelist: vec![],
+                            blacklist: vec!["bar".to_string()],
+                            priority: FilterPriority::Whitelist,
+                        },
+                        state_changes: Default::default(),
+                    }
+                }
+            ],
+            filter: Filter {
+                component: SingleFilter::default(),
+                entity: SingleFilter::default(),
+                state_changes: SingleFilter {
+                    whitelist: vec![StateChange::OnlineStateChange(OnlineStateChange::Offline)],
+                    blacklist: vec![],
+                    priority: FilterPriority::Blacklist
+                }
+            }
+        }));
+    }
+    mod behavior {
+        use crate::filters::{FilterPriority, OnlineStateChange, SingleFilter, StateChange};
+        use super::*;
+        #[test]
+        fn get_email() {
+            let subscriber = Subscriber::Default("mail@example.com".to_string());
+            assert_eq!(subscriber.get_email(), "mail@example.com");
+            assert_eq!(Subscriber::Custom {
+                email: "test@example.com".to_string(),
+                filter: Filter::default(),
+            }.get_email(), "test@example.com");
+        }
+        #[test]
+        fn allows() {
+            let filter = Filter {
+                component: Default::default(),
+                entity: Default::default(),
+                state_changes: SingleFilter {
+                    whitelist: vec![StateChange::OnlineStateChange(OnlineStateChange::Offline)],
+                    blacklist: vec![],
+                    priority: FilterPriority::Blacklist,
+                },
+            };
+            let default_subscriber = Subscriber::Default("test@example.com".to_string());
+            let custom_subscriber = Subscriber::Custom {
+                email: "test@foobar.com".to_string(),
+                filter,
+            };
+            let test_notif1 = server::Notification {
+                component_id: "asdf".to_string(),
+                element_id: "asdf".to_string(),
+                reason: NotificationReason::NewElement(true),
+            };
+            let test_notif2 = server::Notification {
+                component_id: "asdf".to_string(),
+                element_id: "asdf".to_string(),
+                reason: NotificationReason::OnlineStatusChanged(false),
+            };
+            assert!(default_subscriber.allows(&test_notif1));
+            assert!(default_subscriber.allows(&test_notif2));
+            assert!(!custom_subscriber.allows(&test_notif1));
+            assert!(custom_subscriber.allows(&test_notif2));
+        }
     }
 }

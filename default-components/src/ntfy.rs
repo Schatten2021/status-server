@@ -7,7 +7,8 @@ fn default_message() -> String {
     "{element_id} {reason_long}".to_string()
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Default, Debug)]
+// TODO: support actions?
+#[derive(serde::Serialize, serde::Deserialize, Default, Debug, PartialEq)]
 pub struct Config {
     base: String,
     topic: String,
@@ -109,7 +110,7 @@ impl server::NotificationProvider for NtfyNotificationProvider {
                 NotificationReason::OnlineStatusChanged(false) => "went offline".to_string(),
                 NotificationReason::AttributeCreated(id, _) => format!("got attribute {id}"),
                 NotificationReason::AttributeChanged(id, _, _) => format!("attribute {id} changed"),
-                NotificationReason::DeleteAttribute(id, _) => format!("attribute {id} got deleted"),
+                NotificationReason::AttributeDeleted(id, _) => format!("attribute {id} got deleted"),
                 NotificationReason::NewElement(true) => "created (online)".to_string(),
                 NotificationReason::NewElement(false) => "created (offline)".to_string(),
             }),
@@ -118,7 +119,7 @@ impl server::NotificationProvider for NtfyNotificationProvider {
                 NotificationReason::OnlineStatusChanged(false) => "went offline".to_string(),
                 NotificationReason::AttributeCreated(id, val) => format!("attribute {id} got created ({val})"),
                 NotificationReason::AttributeChanged(id, old, new) => format!("attribute {id} got changed ({old} => {new})"),
-                NotificationReason::DeleteAttribute(id, old) => format!("attribute {id} got deleted ({old})"),
+                NotificationReason::AttributeDeleted(id, old) => format!("attribute {id} got deleted ({old})"),
                 NotificationReason::NewElement(true) => "got created and went online".to_string(),
                 NotificationReason::NewElement(false) => "got created and went offline".to_string(),
             }),
@@ -129,13 +130,13 @@ impl server::NotificationProvider for NtfyNotificationProvider {
             }),
             ("attr_old_value".to_string(), match &notification.reason {
                 NotificationReason::AttributeChanged(_, val, _) |
-                NotificationReason::DeleteAttribute(_, val) => val.to_string(),
+                NotificationReason::AttributeDeleted(_, val) => val.to_string(),
                 _ => String::new(),
             }),
             ("attr_id".to_string(), match &notification.reason {
                 NotificationReason::AttributeCreated(id, _) |
                 NotificationReason::AttributeChanged(id, _, _) |
-                NotificationReason::DeleteAttribute(id, _) => id.clone(),
+                NotificationReason::AttributeDeleted(id, _) => id.clone(),
                 _ => String::new(),
             }),
             ("status_new".to_string(), match &notification.reason {
@@ -179,4 +180,62 @@ impl server::NotificationProvider for NtfyNotificationProvider {
             tokio::spawn(request.send());
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use server::Component;
+    use crate::filters::{FilterPriority, SingleFilter};
+    use crate::parse_test;
+    use super::*;
+
+    parse_test!(empty(<NtfyNotificationProvider as Component>::Config): toml::Table::new() => error);
+    parse_test!(full(<NtfyNotificationProvider as Component>::Config): toml!{
+        [[notify]]
+        base = "ntfy.sh"
+        topic = "test"
+        title = "{element_id} {reason_short}"
+        message = "{element_id} {reason_long}"
+        tags = ["foo"]
+        priority = 1
+        click = "https://example.com"
+        attach = "https://example.com/file.jpg"
+        markdown = true
+        icon = "https://example.com/icon.png"
+        filename = "file.jpg"
+        delay = "30min"
+        email = "foo@example.com"
+        call = "+1234556789"
+
+        filter.changes.default = "deny"
+        auth_token = "tk_asdf"
+    } => crate::Notification::new(vec![
+        Config {
+            base: "ntfy.sh".to_string(),
+            topic: "test".to_string(),
+            title: Some("{element_id} {reason_short}".to_string()),
+            message: "{element_id} {reason_long}".to_string(),
+            tags: vec!["foo".to_string()],
+            priority: Some(1),
+            click: Some("https://example.com".parse().unwrap()),
+            attach: Some("https://example.com/file.jpg".parse().unwrap()),
+            markdown: Some(true),
+            icon: Some("https://example.com/icon.png".parse().unwrap()),
+            filename: Some("file.jpg".to_string()),
+            delay: Some("30min".to_string()),
+            email: Some("foo@example.com".to_string()),
+            call: Some("+1234556789".to_string()),
+            filter: Filter {
+                component: Default::default(),
+                entity: Default::default(),
+                state_changes: SingleFilter {
+                    whitelist: vec![],
+                    blacklist: vec![],
+                    priority: FilterPriority::Blacklist,
+                },
+            },
+            auth_token: Some("tk_asdf".to_string()),
+        },
+    ]));
+    // TODO: add formatting test
 }

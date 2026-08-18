@@ -245,7 +245,7 @@ pub mod websocket {
                     attribute_id: id,
                     change: AttributeChange::Change(new.into()),
                 }),
-                server::NotificationReason::DeleteAttribute(id, _) => Self::Attribute(AttributeMessage {
+                server::NotificationReason::AttributeDeleted(id, _) => Self::Attribute(AttributeMessage {
                     attribute_id: id,
                     change: AttributeChange::Delete,
                 })

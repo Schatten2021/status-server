@@ -41,7 +41,7 @@ pub enum NotificationReason {
     ///
     /// # Note
     /// contains the last attribute value.
-    DeleteAttribute(String, AttributeValue),
+    AttributeDeleted(String, AttributeValue),
     /// A new element was created and was designated the given online status.
     NewElement(bool),
 }

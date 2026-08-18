@@ -451,6 +451,7 @@ dependencies = [
  "server",
  "strfmt",
  "tokio",
+ "toml",
  "tracing",
  "url",
  "utils 0.5.2",

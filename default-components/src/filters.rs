@@ -25,6 +25,7 @@ pub struct Filter {
         alias="state", alias="states",
         alias="status", alias="statuses", alias="stati",
         alias="change", alias="changes")]
+    #[serde(default)]
     /// [`SingleFilter`] filtering the state changes.
     pub state_changes: SingleFilter<StateChange>,
 }
@@ -120,22 +121,23 @@ pub enum OnlineStateChange {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 /// Matches when attributes of an element change.
 pub struct AttributeChange {
+    /// The ID of the attribute to match.
     #[serde(flatten)]
-    id: AttributeIdMatcher,
+    pub id: Option<AttributeIdMatcher>,
 
     #[serde(default)]
     /// The actual element being matched.
-    event: AttributeEvent,
+    pub event: AttributeEvent,
 }
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Default)]
 /// Matches an AttributeId.
 pub struct AttributeIdMatcher {
     /// The id of the attribute.
-    id: Option<String>,
+    pub id: String,
 
     #[serde(default="always")]
     /// whether to match the id exactly (no children)
-    exact: bool,
+    pub exact: bool,
 }
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Default)]
 #[serde(rename_all="snake_case")]
@@ -204,7 +206,8 @@ impl Filtering<NotificationReason> for StateChange {
             Self::AttributeChange(change) => match reason {
                 NotificationReason::AttributeCreated(id, _) |
                 NotificationReason::AttributeChanged(id, _, _) |
-                NotificationReason::DeleteAttribute(id, _) => change.event.matches(reason) && change.id.matches(id),
+                NotificationReason::AttributeDeleted(id, _) => change.event.matches(reason) && change.id.as_ref()
+                    .is_none_or(|v| v.matches(id)),
                 _ => false,
             }
         }
@@ -213,14 +216,9 @@ impl Filtering<NotificationReason> for StateChange {
 impl Filtering<String> for AttributeIdMatcher {
     fn matches(&self, value: &String) -> bool {
         if self.exact {
-            self.id.as_ref().is_none_or(|filter| filter == value)
+            &self.id == value
         } else {
-            self.id.as_ref()
-                .is_none_or(|filter|
-                    value.starts_with(filter) &&
-                        value.get(filter.len()..)
-                            .is_none_or(|remaining| remaining.starts_with('.'))
-                )
+            value.starts_with(&self.id) && (value.len() == self.id.len() || value[self.id.len()..].starts_with('.'))
         }
     }
 }
@@ -231,7 +229,548 @@ impl Filtering<NotificationReason> for AttributeEvent {
                 (Self::Any, _) |
                 (Self::Create, NotificationReason::AttributeCreated(_, _)) |
                 (Self::Change, NotificationReason::AttributeChanged(_, _, _)) |
-                (Self::Delete, NotificationReason::DeleteAttribute(_, _))
+                (Self::Delete, NotificationReason::AttributeDeleted(_, _))
             )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::parse_test;
+    use super::*;
+    use toml::toml;
+    macro_rules! behavior_test {
+        ($(#[$meta:meta])* $test_name:ident($test_type:ty: $conf:expr)::$func:ident: $($target_result:ident $check:expr),* $(,)?) => {
+            $(#[$meta])*
+            #[test]
+            fn $test_name() {
+                let item = <$test_type as ::serde::Deserialize>::deserialize($conf).expect(concat!("unable to load config `", stringify!($conf), "`"));
+                let mut success = true;
+                $(success &= {
+                    const SHOULD_MATCH: bool = behavior_test!(@internal:target_result $target_result);
+                    if item.$func(&$check) == SHOULD_MATCH {
+                        true
+                    } else {
+                        if !SHOULD_MATCH {
+                            eprintln!("\x1b[1;31m[UNWANTED BEHAVIOR]\x1b[0m matched `{}` to config `{}` despite expecting it not to.\x1b[0m", stringify!($check), stringify!($conf));
+                        } else {
+                            eprintln!("\x1b[1;31m[UNWANTED BEHAVIOR]\x1b[0m didn't match `{}` for config `{}` despite expecting it to.\x1b[0m", stringify!($check), stringify!($conf));
+                        }
+                        false
+                    }
+                };)*
+                if !success {
+                    panic!("behavior test failed.");
+                }
+            }
+        };
+        (@internal:target_result success)  => {true};
+        (@internal:target_result allow)  => {true};
+        (@internal:target_result allows)  => {true};
+        (@internal:target_result accept)  => {true};
+        (@internal:target_result accepts)  => {true};
+        (@internal:target_result matches)  => {true};
+
+        (@internal:target_result failure)  => {false};
+        (@internal:target_result deny)  => {false};
+        (@internal:target_result denies)  => {false};
+
+    }
+    mod filter {
+        use super::*;
+        mod parse {
+            use super::*;
+            parse_test!(empty(Filter): toml::Table::new() => Filter {
+                component: SingleFilter::default(),
+                entity: SingleFilter::default(),
+                state_changes: SingleFilter::default(),
+            });
+            parse_test!(component(Filter): toml!{
+                component.allow = ["foo"]
+                component.deny = ["bar"]
+                component.default = "deny"
+            } => Filter {
+                component: SingleFilter {
+                    whitelist: vec!["foo".to_string()],
+                    blacklist: vec!["bar".to_string()],
+                    priority: FilterPriority::Blacklist
+                },
+                entity: SingleFilter::default(),
+                state_changes: SingleFilter::default(),
+            });
+            parse_test!(entity(Filter): toml!{
+                entity.allow = ["foo"]
+                entity.deny = ["bar"]
+                entity.default = "deny"
+            } => Filter {
+                component: SingleFilter::default(),
+                entity: SingleFilter {
+                    whitelist: vec!["foo".to_string()],
+                    blacklist: vec!["bar".to_string()],
+                    priority: FilterPriority::Blacklist
+                },
+                state_changes: SingleFilter::default(),
+            });
+            parse_test!(state_change(Filter): toml!{
+                state.allow = ["create", { attribute.event = "any" }]
+            } => Filter {
+                component: SingleFilter::default(),
+                entity: SingleFilter::default(),
+                state_changes: SingleFilter {
+                    whitelist: vec![StateChange::CreateEntity, StateChange::AttributeChange(AttributeChange {
+                        id: None,
+                        event: AttributeEvent::Any
+                    })],
+                    blacklist: vec![],
+                    priority: FilterPriority::Whitelist,
+                }
+            });
+            parse_test!(mixed(Filter): toml!{
+                component.allow = ["foo"]
+                entity.deny = ["bar"]
+                state.default = "deny"
+            } => Filter {
+                component: SingleFilter {
+                    whitelist: vec!["foo".to_string()],
+                    blacklist: vec![],
+                    priority: FilterPriority::Whitelist,
+                },
+                entity: SingleFilter {
+                    whitelist: vec![],
+                    blacklist: vec!["bar".to_string()],
+                    priority: FilterPriority::Whitelist,
+                },
+                state_changes: SingleFilter {
+                    whitelist: vec![],
+                    blacklist: vec![],
+                    priority: FilterPriority::Blacklist,
+                }
+            });
+        }
+        mod behavior {
+            use super::*;
+            use server::{Notification, NotificationReason, AttributeValue};
+            behavior_test!(test1(Filter: toml!{
+                component.allow = ["foo"]
+                component.deny = ["bar", "foo"]
+                entity.allow = ["foo", "bar"]
+                entity.deny = ["bar"]
+                entity.default = "deny"
+                state.allow = [
+                    "create",
+                    { attribute.id = "foo", attribute.exact = true },
+                    { attribute.id = "bar", attribute.exact = false },
+                ]
+                state.deny = [ { online = "up" }]
+                state.mode = "explicit-whitelist"
+            })::allows:
+                denies Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::NewElement(true), // state.deny.online also denies new creations.
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::NewElement(false),
+                },
+                denies Notification {
+                    component_id: "bar".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::NewElement(true),
+                },
+                denies Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "bar".to_string(),
+                    reason: NotificationReason::NewElement(true),
+                },
+                denies Notification {
+                    component_id: "smth".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::NewElement(true),
+                },
+                denies Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::OnlineStatusChanged(true),
+                },
+                denies Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::OnlineStatusChanged(false),
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                },
+                denies Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeCreated("foo.bar".to_string(), AttributeValue::Unit),
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeCreated("bar".to_string(), AttributeValue::Unit),
+                },
+                allows Notification {
+                    component_id: "foo".to_string(),
+                    element_id: "foo".to_string(),
+                    reason: NotificationReason::AttributeCreated("bar.foo".to_string(), AttributeValue::Unit),
+                },
+            );
+        }
+    }
+    mod single_filter {
+        use super::*;
+        mod parse {
+            use super::*;
+            type Filter = SingleFilter<String>;
+            parse_test!(empty(Filter): toml::Table::new() => Filter {
+                whitelist: vec![],
+                blacklist: vec![],
+                priority: FilterPriority::Whitelist
+            });
+            parse_test!(whitelist(Filter): toml!(allow = ["foo", "bar"]) => Filter {
+                whitelist: vec!["foo".to_string(), "bar".to_string()],
+                blacklist: vec![],
+                priority: FilterPriority::Whitelist,
+            });
+            parse_test!(blacklist(Filter): toml!(deny = ["foo", "bar"]) => Filter {
+                whitelist: vec![],
+                blacklist: vec!["foo".to_string(), "bar".to_string()],
+                priority: FilterPriority::Whitelist,
+            });
+            parse_test!(default_deny(Filter): toml!(default = "deny") => Filter {
+                whitelist: vec![],
+                blacklist: vec![],
+                priority: FilterPriority::Blacklist,
+            });
+            parse_test!(mode_explicit_whitelist(Filter): toml!(mode = "explicit-whitelist") => Filter {
+                whitelist: vec![],
+                blacklist: vec![],
+                priority: FilterPriority::Blacklist,
+            });
+            parse_test!(combined(Filter): toml!{
+                enable = ["foo"]
+                disable = ["bar"]
+                default = "deny"
+            } => Filter {
+                whitelist: vec!["foo".to_string()],
+                blacklist: vec!["bar".to_string()],
+                priority: FilterPriority::Blacklist,
+            });
+        }
+        mod behavior {
+            use super::*;
+            type Filter = SingleFilter<String>;
+            behavior_test!(default(Filter: toml!(deny = []))::allows:
+                matches "".to_string(),
+                matches "foo".to_string(),
+            );
+            behavior_test!(whitelist(Filter: toml!{
+                allow = ["foo.bar"]
+                deny = ["foo", "foo.bar"]
+                default = "allow"
+            })::allows:
+                matches "bar".to_string(), // check default
+                denies "foo".to_string(), // check overwrites
+                matches "foo.bar".to_string(), // check prioritizing of whitelist
+            );
+            behavior_test!(blacklist(Filter: toml!{
+                allow = ["foo", "foo.bar"]
+                deny = ["foo.bar"]
+                default = "deny"
+            })::allows:
+                denies "bar".to_string(), // check default
+                allows "foo".to_string(), // check overwrites
+                denies "foo.bar".to_string(), // check prioritizing of blacklist
+            );
+        }
+    }
+    mod state_change {
+        use super::*;
+        use server::{NotificationReason, AttributeValue};
+        mod parse {
+            use super::*;
+            parse_test!(empty(StateChange): toml::Table::new() => error);
+            parse_test!(create(StateChange): toml::Value::String("create".to_string()) => StateChange::CreateEntity);
+            parse_test!(attribute_change(StateChange): toml!{
+                attribute.id = "foo.bar"
+                attribute.event = "create"
+            } => StateChange::AttributeChange(AttributeChange {
+                id: Some(AttributeIdMatcher {
+                    id: "foo.bar".to_string(),
+                    exact: true,
+                }),
+                event: AttributeEvent::Create
+            }));
+            parse_test!(online_state_change(StateChange): toml!{online = "any"} => StateChange::OnlineStateChange(OnlineStateChange::Any));
+            parse_test!(online_state_change_up(StateChange): toml!{online = "up"} => StateChange::OnlineStateChange(OnlineStateChange::Online));
+            parse_test!(online_state_change_down(StateChange): toml!{online = "down"} => StateChange::OnlineStateChange(OnlineStateChange::Offline));
+            parse_test!(multiple(StateChange): toml!{
+                online = "any"
+                attribute.event = "any"
+            } => error);
+        }
+        mod behavior {
+            use super::*;
+            behavior_test! {create(StateChange: toml::Value::String("create".to_string()))::matches:
+                allows NotificationReason::NewElement(true),
+                allows NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{attribute_create(StateChange: toml!{
+                attribute.event = "create"
+            })::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{attribute_change(StateChange: toml!{
+                attribute.event = "change"
+            })::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{attribute_delete(StateChange: toml!{
+                attribute.event = "delete"
+            })::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{attribute_edit(StateChange: toml!{
+                attribute.event = "any"
+            })::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{online_status_change(StateChange: toml!{
+                online = "any"
+            })::matches:
+                allows NotificationReason::NewElement(true),
+                allows NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::OnlineStatusChanged(true),
+                allows NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{online_status_change_up(StateChange: toml!{
+                online = "up"
+            })::matches:
+                allows NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            }
+            behavior_test!{online_status_change_down(StateChange: toml!{
+                online = "down"
+            })::matches:
+                denies NotificationReason::NewElement(true),
+                allows NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                allows NotificationReason::OnlineStatusChanged(false),
+            }
+
+            // template
+            // behavior_test!{attribute_change(StateChange: toml!{
+            //     attribute.event = "create"
+            // })::matches:
+            //     denies NotificationReason::NewElement(true),
+            //     denies NotificationReason::NewElement(false),
+            //     denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+            //     denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+            //     denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+            //     denies NotificationReason::OnlineStatusChanged(true),
+            //     denies NotificationReason::OnlineStatusChanged(false),
+            // }
+        }
+    }
+    mod online_state_change {
+        use super::*;
+        // no parsing, because that's trivial.
+        mod behavior {
+            use super::*;
+            behavior_test!(online(OnlineStateChange: toml::Value::String("up".to_string()))::matches:
+                allows true,
+                denies false,
+            );
+            behavior_test!(offline(OnlineStateChange: toml::Value::String("down".to_string()))::matches:
+                denies true,
+                allows false,
+            );
+            behavior_test!(any(OnlineStateChange: toml::Value::String("any".to_string()))::matches:
+                allows true,
+                allows false,
+            );
+        }
+    }
+    mod attribute_change {
+        use super::*;
+        mod parse {
+            use super::*;
+            parse_test!(all_present(AttributeChange): toml!{
+                id = "foo"
+                exact = false
+                event = "create"
+            } => AttributeChange {
+                id: Some(AttributeIdMatcher {
+                    id: "foo".to_string(),
+                    exact: false,
+                }),
+                event: AttributeEvent::Create,
+            });
+            parse_test!(empty(AttributeChange): toml::Table::new() => AttributeChange {
+                id: None,
+                event: AttributeEvent::Any,
+            });
+            parse_test!(id_only(AttributeChange): toml!(id="foo") => AttributeChange {
+                id: Some(AttributeIdMatcher {
+                    id: "foo".to_string(),
+                    exact: true,
+                }),
+                event: AttributeEvent::Any,
+            });
+            parse_test!(id_exact(AttributeChange): toml!{
+                id="foo"
+                exact=false
+            } => AttributeChange {
+                id: Some(AttributeIdMatcher {
+                    id: "foo".to_string(),
+                    exact: false,
+                }),
+                event: AttributeEvent::Any,
+            });
+            parse_test!(event_only(AttributeChange): toml!(event="create") => AttributeChange {
+                id: None,
+                event: AttributeEvent::Create,
+            });
+
+        }
+    }
+    mod attribute_id_matcher {
+        use super::*;
+        mod parse {
+            use super::*;
+
+            parse_test!(empty(AttributeIdMatcher): toml::Table::new() => error);
+            parse_test!(id(AttributeIdMatcher): toml!(id="foo") => AttributeIdMatcher {
+                id: "foo".to_string(),
+                exact: true,
+            });
+            parse_test!(exact_only(AttributeIdMatcher): toml!(exact=false) => error);
+            parse_test!(exact(AttributeIdMatcher): toml!{
+                id="foo"
+                exact=false
+            } => AttributeIdMatcher {
+                id: "foo".to_string(),
+                exact: false,
+            });
+            }
+        mod behavior {
+            use super::*;
+
+            behavior_test!(exact(AttributeIdMatcher: toml!{
+                id="foo"
+                exact=true
+            })::matches:
+                allows "foo".to_string(),
+                denies "foo.bar".to_string(),
+                denies "bar".to_string(),
+            );
+            behavior_test!(fuzzy(AttributeIdMatcher: toml!{
+                id="foo"
+                exact=false
+            })::matches:
+                allows "foo".to_string(),
+                allows "foo.bar".to_string(),
+                denies "bar".to_string(),
+            );
+        }
+    }
+    mod attribute_event {
+        use super::*;
+        use server::{NotificationReason, AttributeValue};
+        // No parsing, because that's trivial.
+        mod behavior {
+            use super::*;
+            behavior_test!(create(AttributeEvent: toml::Value::String("create".to_string()))::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            );
+            behavior_test!(change(AttributeEvent: toml::Value::String("change".to_string()))::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            );
+            behavior_test!(delete(AttributeEvent: toml::Value::String("delete".to_string()))::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            );
+            behavior_test!(any(AttributeEvent: toml::Value::String("any".to_string()))::matches:
+                denies NotificationReason::NewElement(true),
+                denies NotificationReason::NewElement(false),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::OnlineStatusChanged(true),
+                denies NotificationReason::OnlineStatusChanged(false),
+            );
+        }
     }
 }

@@ -48,3 +48,32 @@ featured_use!(if "minecraft-status": minecraft::MinecraftStatus);
 featured_use!(if "email-notifications": email::EmailNotificationProvider);
 featured_use!(if "ntfy-notifications": ntfy::NtfyNotificationProvider);
 
+#[cfg(test)]
+#[macro_export]
+/// creates a test that simply checks whether the given toml parses correctly.
+macro_rules! parse_test {
+    ($(#[$meta:meta])*$name:ident($ty:ty): $src:expr => error) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() {
+            match <$ty as ::serde::Deserialize>::deserialize($src) {
+                Err(_) => {/* happy :) */},
+                Ok(v)=> panic!("\x1b[1;31m[UNEXPECTED PARSE]\x1b[0m parsed `{}` even though it's supposed to error. Got `{:?}`\x1b[0m", stringify!($src), v),
+            }
+        }
+    };
+    ($(#[$meta:meta])*$name:ident($ty:ty): $src:expr => $target:expr) => {
+        $(#[$meta])*
+        #[test]
+        fn $name() {
+            match <$ty as ::serde::Deserialize>::deserialize($src) {
+                Err(e) => panic!("\x1b[1;31m[PARSING FAILED]\x1b[0m failed to parse `{}` due to: {}\x1b[0m", stringify!($src), e),
+                Ok(v) if v != $target => panic!("\x1b[1;31m[PARSED INVALID]\x1b[0m parsed `{}` invalid. Expected: `{:?}`, got `{:?}`\x1b[0m", stringify!($src), $target, v),
+                Ok(v) => assert_eq!(v, $target), /* happy :) */
+            }
+        }
+    };
+}
+#[cfg(test)]
+#[macro_use]
+extern crate toml;

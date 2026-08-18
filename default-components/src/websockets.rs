@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -9,19 +10,28 @@ use utils::Never;
 use server::{ComponentHandle, Notification, RequestHandle};
 use crate::filters::Filter;
 
-fn default_path() -> String { "/api/ws".to_string() }
+fn default_paths() -> HashSet<String> {
+    HashSet::from([
+        "/api/ws".to_string(),
+        "/api/websocket".to_string(),
+        "/api/socket".to_string(),
+        "/ws".to_string(),
+        "/websocket".to_string(),
+        "/socket".to_string(),
+    ])
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Config {
-    #[serde(default="default_path")]
-    path: String,
+    #[serde(default="default_paths")]
+    paths: HashSet<String>,
     #[serde(default)]
     filter: Filter,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
-            path: default_path(),
+            paths: default_paths(),
             filter: Filter::default(),
         }
     }
@@ -69,7 +79,7 @@ impl server::Component for Websockets {
     }
 
     fn try_handle(&self, request: Request) -> Result<RequestHandle, Request> {
-        if request.uri().path() != self.config.path { return Err(request) }
+        if !self.config.paths.contains(request.uri().path()) { return Err(request) }
         let websockets = self.sockets.clone();
         Ok(Box::pin(async move {
             use axum::extract::{
@@ -119,4 +129,71 @@ impl server::NotificationProvider for Websockets {
             }
         });
     }
+}
+
+#[cfg(test)]
+mod test {
+    use server::Component;
+    use super::*;
+    use crate::{parse_test, Status};
+    use crate::filters::{AttributeChange, AttributeEvent, AttributeIdMatcher, FilterPriority, SingleFilter, StateChange};
+
+    parse_test!(empty(<Websockets as Component>::Config): toml::Table::new() => error);
+    parse_test!(path(<Websockets as Component>::Config): toml!{
+        [notify]
+        paths = ["/tmp", "/tmp/ws"]
+    } => crate::Notification::new(Config {
+        paths: HashSet::from(["/tmp".to_string(), "/tmp/ws".to_string()]),
+        filter: Default::default(),
+    }));
+    parse_test!(filter(<Websockets as Component>::Config): toml!{
+        [notify]
+        filter.changes.deny = [ { attribute.id="minecraft.players", attribute.exact=false } ]
+    } => crate::Notification::new(Config {
+        paths: HashSet::from([
+            "/api/ws".to_string(),
+            "/api/websocket".to_string(),
+            "/api/socket".to_string(),
+            "/ws".to_string(),
+            "/websocket".to_string(),
+            "/socket".to_string(),
+        ]),
+        filter: Filter {
+            component: SingleFilter::default(),
+            entity: SingleFilter::default(),
+            state_changes: SingleFilter {
+                whitelist: vec![],
+                blacklist: vec![StateChange::AttributeChange(AttributeChange {
+                    id: Some(AttributeIdMatcher {
+                        id: "minecraft.players".to_string(),
+                        exact: false,
+                    }),
+                    event: AttributeEvent::Any,
+                })],
+                priority: FilterPriority::Whitelist,
+            },
+        },
+    }));
+    parse_test!(full(<Websockets as Component>::Config): toml!{
+        [notify]
+        paths = ["/tmp", "/tmp/ws"]
+        filter.changes.deny = [ { attribute.id="minecraft.players", attribute.exact=false } ]
+    } => crate::Notification::new(Config {
+        paths: HashSet::from(["/tmp".to_string(), "/tmp/ws".to_string()]),
+        filter: Filter {
+            component: SingleFilter::default(),
+            entity: SingleFilter::default(),
+            state_changes: SingleFilter {
+                whitelist: vec![],
+                blacklist: vec![StateChange::AttributeChange(AttributeChange {
+                    id: Some(AttributeIdMatcher {
+                        id: "minecraft.players".to_string(),
+                        exact: false,
+                    }),
+                    event: AttributeEvent::Any,
+                })],
+                priority: FilterPriority::Whitelist,
+            },
+        },
+    }));
 }

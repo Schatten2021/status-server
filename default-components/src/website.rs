@@ -106,3 +106,36 @@ async fn request_website(client: &reqwest::Client, config: &Config) -> Result<bo
         .status();
     Ok(config.status.whitelisted(&status.as_u16()) || status.is_success() && !config.status.blacklisted(&status.as_u16()))
 }
+#[cfg(test)]
+mod test {
+    use server::Component;
+    use crate::filters::FilterPriority;
+    use crate::parse_test;
+    use super::*;
+    parse_test!(empty(<WebsiteStatuse as Component>::Config): toml::Table::new() => error);
+    parse_test!(parse(<WebsiteStatuse as Component>::Config): toml!{
+        [status.foo]
+        url = "foo.example.com"
+
+        [status.bar]
+        url = "bar.example.com"
+        interval = "5h10m"
+        status.accept = [401]
+        status.default = "deny"
+    } => crate::Status::new(HashMap::from([
+        ("foo".to_string(), Config {
+            url: "foo.example.com".to_string(),
+            interval: hourly(),
+            status: SingleFilter::default(),
+        }),
+        ("bar".to_string(), Config {
+            url: "bar.example.com".to_string(),
+            interval: chrono::Duration::hours(5) + chrono::Duration::minutes(10),
+            status: SingleFilter {
+                whitelist: vec![401],
+                blacklist: vec![],
+                priority: FilterPriority::Blacklist,
+            }
+        })
+    ])));
+}
