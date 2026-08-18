@@ -40,10 +40,11 @@ pub struct Websockets {
 }
 impl server::Component for Websockets {
     const ID: &'static str = "sockets";
-    type Config = Config;
+    type Config = crate::Notification<Config>;
     type ConfigError = Never;
 
     fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.notification;
         let websockets = Arc::new(RwLock::new(Vec::<Socket>::new()));
         let mut ticker = tokio::time::interval(Duration::from_mins(30));
         let ws = websockets.clone();
@@ -63,7 +64,7 @@ impl server::Component for Websockets {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
-        self.config = config;
+        self.config = config.notification;
         Ok(())
     }
 

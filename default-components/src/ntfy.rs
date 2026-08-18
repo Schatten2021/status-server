@@ -82,16 +82,18 @@ pub struct NtfyNotificationProvider {
 }
 impl server::Component for NtfyNotificationProvider {
     const ID: &'static str = "ntfy";
-    type Config = Vec<Config>;
+    type Config = crate::Notification<Vec<Config>>;
     type ConfigError = Never;
 
     fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.notification;
         Ok(Self {
             config,
         })
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+        let config = config.notification;
         self.config = config;
         Ok(())
     }

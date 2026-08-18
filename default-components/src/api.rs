@@ -59,13 +59,18 @@ fn should_handle_path(mut path: &str, mut prefix: &str) -> bool {
         "/current"
     )
 }
+#[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ConfigWrapper {
+    pub frontend: Config,
+}
 
 impl server::Component for Api {
     const ID: &'static str = "api";
-    type Config = Config;
+    type Config = ConfigWrapper;
     type ConfigError = Never;
 
     fn init(server: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.frontend;
         trace!("loaded API with config {config:?}");
         Ok(Self {
             state: server,
@@ -74,6 +79,7 @@ impl server::Component for Api {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+        let config = config.frontend;
         self.config = config;
         Ok(())
     }

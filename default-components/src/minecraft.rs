@@ -41,10 +41,11 @@ pub struct MinecraftStatus {
 }
 impl Component for MinecraftStatus {
     const ID: &'static str = "minecraft";
-    type Config = Config;
+    type Config = crate::Status<Config>;
     type ConfigError = Never;
 
     fn init(server: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.status;
         let handles = config.java.iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .map(|(id, conf)| (id.clone(), start_ping(id, conf, server.clone())))
@@ -57,6 +58,7 @@ impl Component for MinecraftStatus {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+        let config = config.status;
         // JAVA
         for id in self.config.java.keys()
             .filter(|k| !config.java.contains_key(*k))

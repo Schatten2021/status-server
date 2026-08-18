@@ -2,7 +2,7 @@ use axum::extract::Request;
 use utils::Never;
 use server::{Component, ComponentHandle, RequestHandle};
 use crate::Api;
-use crate::api_websockets::Websockets;
+use crate::websockets::Websockets;
 
 /// provides a frontend for the status server.
 pub struct Frontend;

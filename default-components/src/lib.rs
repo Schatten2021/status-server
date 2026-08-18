@@ -35,8 +35,10 @@ use utils::featured_use;
 
 #[cfg(feature = "filters")]
 pub mod filters;
+mod config_wrappers;
+pub(crate) use config_wrappers::{ Notification, Status };
 
-featured_use!(if "websockets": api_websockets::Websockets);
+featured_use!(if "websockets": websockets::Websockets);
 
 featured_use!(if "website-status": website::WebsiteStatuse);
 featured_use!(if "api": api::Api);
@@ -45,3 +47,4 @@ featured_use!(if "dataminer-status": dataminer::DataminerStatus);
 featured_use!(if "minecraft-status": minecraft::MinecraftStatus);
 featured_use!(if "email-notifications": email::EmailNotificationProvider);
 featured_use!(if "ntfy-notifications": ntfy::NtfyNotificationProvider);
+

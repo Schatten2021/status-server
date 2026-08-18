@@ -74,5 +74,6 @@ enum Command {
         #[arg(short, long, default_value_t=5000)]
         port: u16,
     },
+    #[clap(alias="config-test", alias="config-check", alias="test-config")]
     CheckConfig,
 }

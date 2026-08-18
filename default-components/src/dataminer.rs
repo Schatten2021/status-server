@@ -24,10 +24,11 @@ pub struct DataminerStatus {
 }
 impl Component for DataminerStatus {
     const ID: &'static str = "miner";
-    type Config = HashMap<String, Config>;
+    type Config = crate::Status<HashMap<String, Config>>;
     type ConfigError = Never;
 
     fn init(server: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.status;
         let timeout_handles = config.iter()
             .map(|(a, b)| (a.clone(), b.clone()))
             .map(|(a, b)| (a.clone(), spawn_timeout_task(a, b, server.clone())))
@@ -40,6 +41,7 @@ impl Component for DataminerStatus {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+        let config = config.status;
         for id in self.config.keys()
             .filter(|k| !config.contains_key(*k))
             .cloned()

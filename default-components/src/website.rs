@@ -34,10 +34,11 @@ pub struct WebsiteStatuse {
 }
 impl server::Component for WebsiteStatuse {
     const ID: &'static str = "website";
-    type Config = HashMap<String, Config>;
+    type Config = crate::Status<HashMap<String, Config>>;
     type ConfigError = Never;
 
     fn init(server: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.status;
         Ok(Self {
             task_handles: config.iter()
                 .map(|(a, b)| (a.clone(), b.clone()))
@@ -51,6 +52,7 @@ impl server::Component for WebsiteStatuse {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+        let config = config.status;
         for id in self.config.keys()
             .filter(|k| !config.contains_key(*k))
             .cloned()

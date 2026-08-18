@@ -65,10 +65,11 @@ pub struct EmailNotificationProvider {
 
 impl Component for EmailNotificationProvider {
     const ID: &'static str = "email";
-    type Config = Config;
+    type Config = crate::Notification<Config>;
     type ConfigError = Never;
 
     fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+        let config = config.notification;
         Ok(Self {
             credentials: Credentials::new(config.address.clone(), config.password.clone()),
             config,
@@ -76,7 +77,7 @@ impl Component for EmailNotificationProvider {
     }
 
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
-        self.config = config;
+        self.config = config.notification;
         self.credentials = Credentials::new(self.config.address.clone(), self.config.password.clone());
         Ok(())
     }
