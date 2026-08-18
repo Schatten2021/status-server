@@ -135,7 +135,7 @@ impl server::NotificationProvider for Websockets {
 mod test {
     use server::Component;
     use super::*;
-    use crate::{parse_test, Status};
+    use crate::parse_test;
     use crate::filters::{AttributeChange, AttributeEvent, AttributeIdMatcher, FilterPriority, SingleFilter, StateChange};
 
     parse_test!(empty(<Websockets as Component>::Config): toml::Table::new() => error);

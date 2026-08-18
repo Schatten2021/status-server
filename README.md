@@ -67,3 +67,9 @@ can use `email.status`; NOTE: `notify` are also aliased as `notifications`). The
 | dataminer  | `miner`     | `status`   | dataminer-status    | [ref](docs/config/dataminer.md)  |
 
 Additionally, many configurations use [filters](docs/config/filter.md) to provide a uniform filtering interface.
+
+# Versioning 
+This project uses [semantic versioning](https://semver.org/) for its binaries.
+This means that the released compiled binaries (and source-code) are backwards compatible between minor version changes.
+
+This is ensured via config-tests. Any change to any of the config tests is considered a breaking change.
