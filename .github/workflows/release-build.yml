@@ -21,6 +21,17 @@ jobs:
               uses: actions/checkout@v7
             - name: Install target toolchains
               run: rustup target add wasm32-unknown-unknown ${{ env.TARGETS }}
+            - name: Install clippy
+              run: rustup component add clippy
+
+            # ensure that there are no issues with the code
+            - name: Clippy check
+              run: |
+                mkdir -p static/wasm
+                touch static/wasm/frontend.js static/wasm/frontend_bg.wasm
+                cargo clippy --workspace --all-targets -- -D warnings
+            - name: Tests
+              run: cargo test --workspace
 
             # wasm-bindgen setup
             - name: Install wasm-bindgen-cli

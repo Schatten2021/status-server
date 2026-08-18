@@ -1,4 +1,4 @@
-name: Clippy
+name: Tests
 
 on:
   push:
@@ -13,13 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Install clippy
-        run: rustup component add clippy
-
       - name: Add neccessary files
         run: |
           mkdir -p static/wasm
           touch static/wasm/frontend.js static/wasm/frontend_bg.wasm
 
       - name: Run clippy on workspace
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo test --workspace --lib 
