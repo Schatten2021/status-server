@@ -52,18 +52,18 @@ global config field (so `global.ignored.components`).
 server, even if that breaks other [Component](#component). Deleting a [Component](#component) by removing it and 
 reloading the configuration also removes any dependants.
 
-Each [Component](#component) is configured via its `ID`. 
-The ids for the default components are:
+Each [Component](#component) is configured via its `ID` and usually a suffix (so that e.g. future E-Mail status support
+can use `email.status`; NOTE: `notify` are also aliased as `notifications`). The ids for the default components are:
 
-| Component  | ID        | feature             | config reference                 |
-|------------|-----------|---------------------|----------------------------------|
-| api        | api       | api                 | [ref](docs/config/api.md)        |
-| websockets | sockets   | websockets          | [ref](docs/config/websockets.md) |
-| frontend   | frontend  | frontend            | no config                        |
-| ntfy       | ntfy      | ntfy-notifications  | [ref](docs/config/ntfy.md)       |
-| email      | email     | email-notifications | [ref](docs/config/email.md)      |
-| minecraft  | minecraft | minecraft-status    | [ref](docs/config/minecraft.md)  |
-| website    | website   | website-status      | [ref](docs/config/website.md)    |
-| dataminer  | miner     | dataminer-status    | [ref](docs/config/dataminer.md)  |
+| Component  | ID          | suffix     | feature             | config reference                 |
+|------------|-------------|------------|---------------------|----------------------------------|
+| api        | `api`       | `frontend` | api                 | [ref](docs/config/api.md)        |
+| websockets | `sockets`   | `notify`   | websockets          | [ref](docs/config/websockets.md) |
+| frontend   | `frontend`  | none       | frontend            | no config                        |
+| ntfy       | `ntfy`      | `notify`   | ntfy-notifications  | [ref](docs/config/ntfy.md)       |
+| email      | `email`     | `notify`   | email-notifications | [ref](docs/config/email.md)      |
+| minecraft  | `minecraft` | `status`   | minecraft-status    | [ref](docs/config/minecraft.md)  |
+| website    | `website`   | `status`   | website-status      | [ref](docs/config/website.md)    |
+| dataminer  | `miner`     | `status`   | dataminer-status    | [ref](docs/config/dataminer.md)  |
 
 Additionally, many configurations use [filters](docs/config/filter.md) to provide a uniform filtering interface.

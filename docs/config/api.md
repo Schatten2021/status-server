@@ -9,7 +9,7 @@ API configuration
 
 ## Example
 ```toml
-[api]
+[api.frontend]
 path = "/api" # the default path
-filter-attributes = ["minecraft.players"] # do not display online player-count/players
+attributes.allow = ["minecraft.players"] # do not display online player-count/players
 ```

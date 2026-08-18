@@ -29,5 +29,9 @@ Additionally, `title` and `message` are formatted strings with the following arg
 
 # Example
 ```toml
-[ntfy]
+[[ntfy.notify]]
+base = "https://ntfy.sh/"
+filter.deny.state = [ "create", { attribute.event="any" } ]
+title = "{element_id} {reason_short}"
+message = "{component_id} {element_id} {reason_long}"
 ```

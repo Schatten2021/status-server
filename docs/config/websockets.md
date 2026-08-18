@@ -7,7 +7,7 @@ Websocket configuration
 
 ## Example
 ```toml
-[sockets]
+[sockets.notify]
 path = "/ws"
 filter.changes.deny = [{ attribute.id = "minecraft.players", attribute.exact = false }]
 ```

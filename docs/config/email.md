@@ -14,7 +14,7 @@ Subscribers can either be the E-Mail-Address or an object with an E-Mail-Address
 
 # Example
 ```toml
-[email]
+[email.notify]
 address = "noreply@example.com"
 password = "Password1234"
 server = "mail.example.com"
