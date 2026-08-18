@@ -226,8 +226,8 @@ mod test {
             email: Some("foo@example.com".to_string()),
             call: Some("+1234556789".to_string()),
             filter: Filter {
-                component: Default::default(),
-                entity: Default::default(),
+                component: SingleFilter::default(),
+                entity: SingleFilter::default(),
                 state_changes: SingleFilter {
                     whitelist: vec![],
                     blacklist: vec![],

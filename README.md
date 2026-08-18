@@ -1,6 +1,7 @@
 Status Server
 -------------
 [![Clippy Check](https://github.com/Schatten2021/status-server/actions/workflows/clippy-check.yml/badge.svg)](https://github.com/Schatten2021/status-server/actions/workflows/clippy-check.yml)
+[![Tests](https://github.com/Schatten2021/status-server/actions/workflows/test-check.yml/badge.svg)](https://github.com/Schatten2021/status-server/actions/workflows/test-check.yml)
 
 This is my own status-monitoring server.
 

@@ -144,7 +144,7 @@ mod test {
         paths = ["/tmp", "/tmp/ws"]
     } => crate::Notification::new(Config {
         paths: HashSet::from(["/tmp".to_string(), "/tmp/ws".to_string()]),
-        filter: Default::default(),
+        filter: Filter::default(),
     }));
     parse_test!(filter(<Websockets as Component>::Config): toml!{
         [notify]

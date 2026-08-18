@@ -476,7 +476,7 @@ mod test {
             use super::*;
             type Filter = SingleFilter<String>;
             behavior_test!(default(Filter: toml!(deny = []))::allows:
-                matches "".to_string(),
+                matches String::new(),
                 matches "foo".to_string(),
             );
             behavior_test!(whitelist(Filter: toml!{

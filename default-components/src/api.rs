@@ -169,18 +169,19 @@ impl server::Component for Api {
 
 #[cfg(test)]
 mod test {
+    use crate::filters::FilterPriority;
     use super::*;
     use crate::parse_test;
 
     parse_test!(parse_empty(Config): toml::Table::new() => Config {
         path: "/api/".to_string(),
-        attribute_filter: Default::default(),
-        element_filter: Default::default(),
+        attribute_filter: SingleFilter::default(),
+        element_filter: SingleFilter::default(),
     });
     parse_test!(with_path(Config): toml!{path = "/legacy/api"} => Config {
         path: "/legacy/api".to_string(),
-        attribute_filter: Default::default(),
-        element_filter: Default::default(),
+        attribute_filter: SingleFilter::default(),
+        element_filter: SingleFilter::default(),
     });
     parse_test!(attribute_filter(Config): toml!{attributes.allow = [{ id="test" }, { id="foo.bar", exact=false }]} => Config {
         path: "/api/".to_string(),
@@ -190,9 +191,9 @@ mod test {
                 AttributeIdMatcher { id: "foo.bar".to_string(), exact: false }
             ],
             blacklist: vec![],
-            priority: Default::default(),
+            priority: FilterPriority::default(),
         },
-        element_filter: Default::default(),
+        element_filter: SingleFilter::default(),
     });
     parse_test!(element_filter(Config): toml!{elements.deny = ["foo", "bar"]} => Config {
         path: "/api/".to_string(),
@@ -203,7 +204,7 @@ mod test {
                 "foo".to_string(),
                 "bar".to_string(),
             ],
-            priority: Default::default(),
+            priority: FilterPriority::default(),
         }
     });
 }

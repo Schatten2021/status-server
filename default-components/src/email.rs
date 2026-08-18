@@ -196,13 +196,13 @@ mod test {
                 Subscriber::Custom {
                     email: "test@example.com".to_string(),
                     filter: Filter {
-                        component: Default::default(),
+                        component: SingleFilter::default(),
                         entity: SingleFilter {
                             whitelist: vec![],
                             blacklist: vec!["bar".to_string()],
                             priority: FilterPriority::Whitelist,
                         },
-                        state_changes: Default::default(),
+                        state_changes: SingleFilter::default(),
                     }
                 }
             ],
@@ -232,8 +232,8 @@ mod test {
         #[test]
         fn allows() {
             let filter = Filter {
-                component: Default::default(),
-                entity: Default::default(),
+                component: SingleFilter::default(),
+                entity: SingleFilter::default(),
                 state_changes: SingleFilter {
                     whitelist: vec![StateChange::OnlineStateChange(OnlineStateChange::Offline)],
                     blacklist: vec![],
