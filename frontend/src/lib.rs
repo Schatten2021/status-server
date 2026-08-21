@@ -99,7 +99,7 @@ impl yew::Component for App {
                             let location = window.location();
                             (
                                 location.host().unwrap_or_default(),
-                                location.protocol().unwrap_or_default() == "https"
+                                location.protocol().unwrap_or_default().starts_with("https")
                             )
                         } else {
                             (String::new(), false)
