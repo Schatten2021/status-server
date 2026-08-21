@@ -129,7 +129,10 @@ impl server::Component for Api {
         if !should_handle_path(request.uri().path(), &self.config.path) {
             return Err(request)
         }
-        let path_prefix_len = self.config.path.len();
+        let mut path_prefix_len = self.config.path.len();
+        if self.config.path.ends_with('/') {
+            path_prefix_len -= 1;
+        }
         let state = self.state.clone();
         let attribute_filter = self.config.attribute_filter.clone();
         let element_filter = self.config.element_filter.clone();
@@ -151,7 +154,7 @@ impl server::Component for Api {
                 },
                 // TODO: add routes for requesting selected elements/stati/etc.
                 _ => {
-                    error!("route set to handle but no handle registered!");
+                    error!("route `{path}` set to handle but no handle registered!");
                     exception!("unhandled.route", "Route marked as handled without a handle registered!")
                 }
             };
