@@ -94,7 +94,19 @@ impl yew::Component for App {
                 let link = ctx.link().clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     use futures_util::StreamExt;
-                    let mut socket = gloo_net::websocket::futures::WebSocket::open("ws://127.0.0.1:8000/api/ws")
+                    let (host, secure) = {
+                        if let Some(window) = web_sys::window() {
+                            let location = window.location();
+                            (
+                                location.host().unwrap_or_default(),
+                                location.protocol().unwrap_or_default() == "https"
+                            )
+                        } else {
+                            (String::new(), false)
+                        }
+                    };
+                    let url = format!("{}://{host}/api/ws", if secure { "wss" } else { "ws" });
+                    let mut socket = gloo_net::websocket::futures::WebSocket::open(&url)
                         .expect("unable to open websocket");
                     while let Some(Ok(message)) = socket.next().await {
                         let message = match message {
