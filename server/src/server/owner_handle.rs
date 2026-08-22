@@ -110,6 +110,16 @@ impl ServerHandle {
     pub fn get_states(&self) -> HashMap<String, State> {
         self.0.read().get_states()
     }
+
+    /// returns the current config path.
+    #[must_use]
+    pub fn get_config_path(&self) -> PathBuf {
+        self.0.read().get_config_path()
+    }
+    /// sets the config path
+    pub fn set_config_path(&self, path: PathBuf) {
+        self.0.write().set_config_path(path)
+    }
 }
 impl axum::handler::Handler<(), ()> for ServerHandle {
     type Future = Pin<Box<dyn Future<Output=axum::response::Response> + Send + 'static>>;

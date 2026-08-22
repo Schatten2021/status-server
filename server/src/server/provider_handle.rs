@@ -5,6 +5,7 @@ use crate::{Component, State};
 use parking_lot::RwLock;
 use std::any::TypeId;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -146,5 +147,15 @@ impl ComponentHandle {
     pub fn reload_config(&self) -> &Self {
         self.backend.write().reload_config();
         self
+    }
+
+    /// returns the current config path.
+    #[must_use]
+    pub fn get_config_path(&self) -> PathBuf {
+        self.backend.read().get_config_path()
+    }
+    /// sets the config path
+    pub fn set_config_path(&self, path: PathBuf) {
+        self.backend.write().set_config_path(path)
     }
 }

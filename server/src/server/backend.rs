@@ -186,6 +186,12 @@ impl Server {
     pub(crate) fn ignored<C: Component>(&self) -> bool {
         self.loaded_config.global.ignored.components.contains(C::ID)
     }
+    pub(crate) fn get_config_path(&self) -> PathBuf {
+        self.config_path.clone()
+    }
+    pub(crate) fn set_config_path(&mut self, path: PathBuf) {
+        self.config_path = path;
+    }
 }
 impl Server {
     pub(crate) fn new(config_path: PathBuf) -> Self {
