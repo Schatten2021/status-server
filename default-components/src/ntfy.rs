@@ -102,7 +102,7 @@ impl server::Component for NtfyNotificationProvider {
 
 impl server::NotificationProvider for NtfyNotificationProvider {
     fn notify(&self, notification: Notification) {
-        let format_values = HashMap::from([
+        let mut format_values = HashMap::from([
             ("component_id".to_string(), notification.component_id.clone()),
             ("element_id".to_string(), notification.element_id.clone()),
             ("reason_short".to_string(), match &notification.reason {
@@ -127,41 +127,35 @@ impl server::NotificationProvider for NtfyNotificationProvider {
                 NotificationReason::NewElement(true) => "got created and went online".to_string(),
                 NotificationReason::NewElement(false) => "got created and went offline".to_string(),
             }),
-            ("attr_new_value".to_string(), match &notification.reason {
-                NotificationReason::AttributeEdit(edit) => match &edit.change {
-                    AttributeValueChange::Create(new) |
-                    AttributeValueChange::Edit(_, new) => new.to_string(),
-                    AttributeValueChange::Delete(_) => String::new(),
-                }
-                _ => String::new()
-            }),
-            ("attr_old_value".to_string(), match &notification.reason {
-                NotificationReason::AttributeEdit(edit) => match &edit.change {
-                    AttributeValueChange::Delete(old) |
-                    AttributeValueChange::Edit(old, _) => old.to_string(),
-                    AttributeValueChange::Create(_) => String::new(),
-                }
-                _ => String::new(),
-            }),
-            ("attr_id".to_string(), match &notification.reason {
-                NotificationReason::AttributeEdit(edit) => edit.id.clone(),
-                _ => String::new(),
-            }),
-            ("status_new".to_string(), match &notification.reason {
-                NotificationReason::NewElement(true) |
-                NotificationReason::OnlineStatusChanged(true) => "online".to_string(),
-                NotificationReason::NewElement(false) |
-                NotificationReason::OnlineStatusChanged(false) => "offline".to_string(),
-                _ => String::new(),
-            }),
-            ("status_old".to_string(), match &notification.reason {
-                NotificationReason::NewElement(true) |
-                NotificationReason::OnlineStatusChanged(true) => "offline".to_string(),
-                NotificationReason::NewElement(false) |
-                NotificationReason::OnlineStatusChanged(false) => "online".to_string(),
-                _ => String::new(),
-            }),
         ]);
+        match &notification.reason {
+            NotificationReason::NewElement(true) |
+            NotificationReason::OnlineStatusChanged(true) => {
+                format_values.insert("status_new".to_string(), "online".to_string());
+                format_values.insert("status_old".to_string(), "offline".to_string());
+            }
+            NotificationReason::NewElement(false) |
+            NotificationReason::OnlineStatusChanged(false) => {
+
+                format_values.insert("status_new".to_string(), "offline".to_string());
+                format_values.insert("status_old".to_string(), "online".to_string());
+            }
+            NotificationReason::AttributeEdit(change) => {
+                format_values.insert("attr_id".to_string(), change.id.clone());
+                match &change.change {
+                    AttributeValueChange::Create(new) => {
+                        format_values.insert("attr_new_value".to_string(), new.to_string());
+                    }
+                    AttributeValueChange::Edit(old, new) => {
+                        format_values.insert("attr_new_value".to_string(), new.to_string());
+                        format_values.insert("attr_old_values".to_string(), old.to_string());
+                    }
+                    AttributeValueChange::Delete(old) => {
+                        format_values.insert("attr_old_values".to_string(), old.to_string());
+                    }
+                }
+            }
+        }
         debug!("sending ntfy notification with format values: {:?}", format_values);
         let client = reqwest::Client::new();
         for config in &self.config {
