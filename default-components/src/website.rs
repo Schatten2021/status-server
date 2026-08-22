@@ -91,7 +91,7 @@ fn spawn_listen_task(id: String, config: Config, state: ComponentHandle) -> toki
             }
             if new_status {
                 trace!("successfully requested {}", config.url);
-                state.change_attribute(&id, LAST_SEEN_ID, AttributeValue::Date(chrono::Utc::now()));
+                state.change_attribute(&id, LAST_SEEN_ID, AttributeValue::Timestamp(chrono::Utc::now()));
             } else {
                 trace!("failed to request {}", config.url);
             }

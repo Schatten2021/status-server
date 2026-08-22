@@ -402,32 +402,32 @@ mod test {
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
+                    reason: NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
+                    reason: NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                    reason: NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 },
                 denies Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("foo.bar".to_string(), AttributeValue::Unit),
+                    reason: NotificationReason::AttributeCreated("foo.bar".to_string(), AttributeValue::Marker),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("bar".to_string(), AttributeValue::Unit),
+                    reason: NotificationReason::AttributeCreated("bar".to_string(), AttributeValue::Marker),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("bar.foo".to_string(), AttributeValue::Unit),
+                    reason: NotificationReason::AttributeCreated("bar.foo".to_string(), AttributeValue::Marker),
                 },
             );
         }
@@ -529,9 +529,9 @@ mod test {
             behavior_test! {create(StateChange: toml::Value::String("create".to_string()))::matches:
                 allows NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -540,9 +540,9 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -551,9 +551,9 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -562,9 +562,9 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -573,9 +573,9 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -584,9 +584,9 @@ mod test {
             })::matches:
                 allows NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 allows NotificationReason::OnlineStatusChanged(true),
                 allows NotificationReason::OnlineStatusChanged(false),
             }
@@ -595,9 +595,9 @@ mod test {
             })::matches:
                 allows NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 allows NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -606,9 +606,9 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 allows NotificationReason::OnlineStatusChanged(false),
             }
@@ -619,9 +619,9 @@ mod test {
             // })::matches:
             //     denies NotificationReason::NewElement(true),
             //     denies NotificationReason::NewElement(false),
-            //     denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-            //     denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-            //     denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+            //     denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+            //     denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+            //     denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
             //     denies NotificationReason::OnlineStatusChanged(true),
             //     denies NotificationReason::OnlineStatusChanged(false),
             // }
@@ -738,36 +738,36 @@ mod test {
             behavior_test!(create(AttributeEvent: toml::Value::String("create".to_string()))::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             );
             behavior_test!(change(AttributeEvent: toml::Value::String("change".to_string()))::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             );
             behavior_test!(delete(AttributeEvent: toml::Value::String("delete".to_string()))::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             );
             behavior_test!(any(AttributeEvent: toml::Value::String("any".to_string()))::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Unit),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Unit, AttributeValue::Unit),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Unit),
+                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             );

@@ -86,31 +86,24 @@ struct ServerError {
     message: String,
 });
 api_type!(
-#[derive(Default)]
-/// The values that a component attribute can have.
+#[non_exhaustive]
+/// A value an Attribute can have.
+///
+/// # Note
+/// This is `#[non_exhaustive]`, so that adding a new variant in the future isn't a breaking change.
 enum AttributeValue {
-    #[default]
-    /// Primarily meant for marker attributes.
-    /// Supposed to mark "This attribute exists".
-    Unit,
-    /// A Boolean value.
-    Boolean(bool),
-    /// Some sort of count.
-    Count(usize),
-    /// A date. Useful for keeping track when an element was seen.
-    Date(chrono::DateTime<chrono::Utc>),
-    /// A percentage of some kind.
+    /// Marks that an attribute exists with no value.
+    Marker,
+    /// Some custom (or primitive) format
+    Custom(bytecode::ByteCode),
+    /// A DateTime.
+    ///
+    /// This is very useful for [`crate::Component`]s that store the last seen time in the attributes.
+    Timestamp(chrono::DateTime<chrono::Utc>),
+    /// A percentage.
     Percentage(f32),
-    /// A list of [`AttributeValue`]s.
-    List(Vec<AttributeValue>),
-    /// Some sort of number
-    Number(i128),
-    /// Some string.
-    String(String),
-    /// An enum variant.
-    Enum(EnumAttributeValue),
-    /// A map mapping one [`AttributeValue`] to another.
-    Map(Vec<(AttributeValue, AttributeValue)>)
+    /// A history over (previous) values.
+    History(Vec<(chrono::DateTime<chrono::Utc>, AttributeValue)>),
 });
 api_type!(
 /// Data for an [`AttributeValue::Enum`]
@@ -124,18 +117,14 @@ struct EnumAttributeValue  {
 impl From<server::AttributeValue> for AttributeValue {
     fn from(value: server::AttributeValue) -> Self {
         match value {
-            server::AttributeValue::Unit => Self::Unit,
-            server::AttributeValue::Boolean(v) => Self::Boolean(v),
-            server::AttributeValue::Count(v) => Self::Count(v),
-            server::AttributeValue::Date(v) => Self::Date(v),
+            server::AttributeValue::Marker => Self::Marker,
+            server::AttributeValue::Custom(inner) => Self::Custom(inner),
+            server::AttributeValue::Timestamp(dt) => Self::Timestamp(dt),
             server::AttributeValue::Percentage(v) => Self::Percentage(v),
-            server::AttributeValue::List(v) => Self::List(v.into_iter().map(Into::into).collect()),
-            server::AttributeValue::Number(v) => Self::Number(v),
-            server::AttributeValue::String(v) => Self::String(v),
-            server::AttributeValue::Enum { variant, value } => Self::Enum(EnumAttributeValue { variant, value: Box::new((*value).into()) }),
-            server::AttributeValue::Map(v) => Self::Map(v.into_iter()
-                .map(|(a, b)| (a.into(), b.into()))
+            server::AttributeValue::History(hist) => Self::History(hist.into_iter()
+                .map(|(a, b)| (a, b.into()))
                 .collect()),
+            _ => todo!("outdated api-types!")
         }
     }
 }

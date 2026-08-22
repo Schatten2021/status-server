@@ -10,3 +10,4 @@ server-support = ["dep:server"]
 serde = { workspace = true, features = ["derive"] }
 chrono = { workspace = true, features = ["serde"] }
 server = { workspace = true, optional = true }
+bytecode = { workspace = true, features = ["serde"] }

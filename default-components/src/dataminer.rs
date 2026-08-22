@@ -70,7 +70,7 @@ impl Component for DataminerStatus {
         let id = args["id=".len()..].to_string();
         let server = self.server.clone();
         Ok(Box::pin(async move {
-            server.change_attribute(&id, LAST_SEEN_ID, AttributeValue::Date(chrono::Utc::now()));
+            server.change_attribute(&id, LAST_SEEN_ID, AttributeValue::Timestamp(chrono::Utc::now()));
             if !matches!(server.get_online_state(&id), Some(true)) {
                 server.change_online_state(&id, true);
             }
@@ -88,7 +88,7 @@ fn spawn_timeout_task(id: String, config: Config, handle: ComponentHandle) -> to
         let config = config;
         loop {
             ticker.tick().await;
-            let last_seen = if let Some(AttributeValue::Date(dt)) = handle.get_attribute(&id, LAST_SEEN_ID) {
+            let last_seen = if let Some(AttributeValue::Timestamp(dt)) = handle.get_attribute(&id, LAST_SEEN_ID) {
                 Some(dt)
             } else {
                 trace!("dataminer never seen before");

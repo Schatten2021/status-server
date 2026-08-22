@@ -35,22 +35,21 @@ fn display_attribute(props: &AttributeDisplayProps) -> Html {
 }
 fn render_attr_value(value: &AttributeValue) -> String {
     match value {
-        AttributeValue::Unit => "()".to_string(),
-        AttributeValue::Boolean(v) => format!("{v}"),
-        AttributeValue::Count(v) => format!("{v}"),
-        AttributeValue::Date(d) => d.naive_local().format("%d.%m.%Y %H:%M:%S%.3f").to_string(),
-        AttributeValue::Percentage(v) => format!("{:.2}", v * 100.0),
-        AttributeValue::List(values) => format!("[{}]", values.iter()
-            .map(render_attr_value)
-            .collect::<Vec<_>>()
-            .join(", ")),
-        AttributeValue::Number(v) => format!("{v}"),
-        AttributeValue::String(v) => v.clone(),
-        AttributeValue::Enum(v) => format!("{}({})", v.variant, render_attr_value(&v.value)),
-        AttributeValue::Map(map) => format!("{{{}}}", map.iter()
-            .map(|(k, v)| format!("{}: {}", render_attr_value(k), render_attr_value(v)))
-            .collect::<Vec<_>>()
-            .join(", ")
-        )
+        AttributeValue::Marker => String::new(),
+        AttributeValue::Custom(inner) => inner.to_string(),
+        AttributeValue::Timestamp(dt) => dt.format("%d.%m.%Y %H:%M:%S%.3f").to_string(),
+        AttributeValue::Percentage(val) => format!("{:.2}%", val * 100.0),
+        AttributeValue::History(history) => {
+            use std::fmt::Write;
+            let mut res = String::new();
+            for (timestamp, value) in history {
+                writeln!(res, "{}: {},",
+                         timestamp.format("%d.%m.%Y %H:%M:%S%.3f"),
+                         render_attr_value(value)
+                ).expect("unable to build history string");
+            }
+            res
+        }
+        _ => todo!("unmatched attribute value!")
     }
 }

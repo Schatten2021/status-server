@@ -14,3 +14,4 @@ tracing.workspace = true
 toml.workspace = true
 axum.workspace = true
 async-trait.workspace = true
+bytecode = { workspace = true, features = ["serde"] }

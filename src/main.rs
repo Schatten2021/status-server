@@ -6,13 +6,13 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::complexity, clippy::suspicious, clippy::perf, clippy::style, clippy::allow_attributes_without_reason)]
 #![allow(
-clippy::needless_continue,
-reason = "adding a `continue` often makes the code easier to read."
+    clippy::needless_continue,
+    reason = "adding a `continue` often makes the code easier to read."
 )]
 #![allow(
-clippy::missing_errors_doc,
-clippy::doc_markdown,
-reason = "don't want these lints."
+    clippy::missing_errors_doc,
+    clippy::doc_markdown,
+    reason = "don't want these lints."
 )]
 #![cfg_attr(not(debug_assertions), deny(clippy::undocumented_unsafe_blocks))]
 #![cfg_attr(debug_assertions, warn(clippy::undocumented_unsafe_blocks))]

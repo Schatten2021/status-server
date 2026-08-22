@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use bytecode::ByteCode;
 use tokio::time::MissedTickBehavior;
 use utils::Never;
 use server::{AttributeValue, Component, ComponentHandle};
@@ -104,18 +105,18 @@ fn start_ping(id: String, conf: JavaConfig, state: ComponentHandle) -> tokio::ta
                     }
                 }};
             }
-            set_if_unchanged!("minecraft.last_seen", AttributeValue::Date(chrono::Utc::now()));
-            set_if_unchanged!("minecraft.version", AttributeValue::String(response.version.name));
-            set_if_unchanged!("minecraft.protocol.version", AttributeValue::Number(response.version.protocol.into()));
+            set_if_unchanged!("minecraft.last_seen", AttributeValue::Timestamp(chrono::Utc::now()));
+            set_if_unchanged!("minecraft.version", AttributeValue::Custom(ByteCode::String(response.version.name)));
+            set_if_unchanged!("minecraft.protocol.version", AttributeValue::Custom(ByteCode::U16(response.version.protocol)));
             if let Some(players) = response.players {
-                set_if_unchanged!("minecraft.players.max", AttributeValue::Number(players.max as i128));
-                set_if_unchanged!("minecraft.players.online", AttributeValue::Number(players.online as i128));
+                set_if_unchanged!("minecraft.players.max", AttributeValue::Custom(ByteCode::U64(players.max as u64)));
+                set_if_unchanged!("minecraft.players.online", AttributeValue::Custom(ByteCode::U64(players.online as u64)));
                 if let Some(sample) = players.sample {
-                    set_if_unchanged!("minecraft.players.sample", AttributeValue::List(
+                    set_if_unchanged!("minecraft.players.sample", AttributeValue::Custom(ByteCode::Sequence(
                         sample.into_iter()
-                        .map(|player| AttributeValue::String(player.name))
+                        .map(|player| ByteCode::String(player.name))
                         .collect::<Vec<_>>()
-                    ));
+                    )));
                 } else {
                     state.delete_attribute(&id, "minecraft.players.sample", true);
                 }
@@ -125,19 +126,19 @@ fn start_ping(id: String, conf: JavaConfig, state: ComponentHandle) -> tokio::ta
                 state.delete_attribute(&id, "state.players.sample", true);
             }
             if let Some(description) = response.description {
-                set_if_unchanged!("minecraft.description", AttributeValue::String(description));
+                set_if_unchanged!("minecraft.description", AttributeValue::Custom(ByteCode::String(description)));
             } else {
                 state.delete_attribute(&id, "minecraft.description", true);
             }
             if let Some(favicon) = response.favicon {
-                set_if_unchanged!("minecraft.favicon", AttributeValue::String(favicon));
+                set_if_unchanged!("minecraft.favicon", AttributeValue::Custom(ByteCode::String(favicon)));
             } else {
                 state.delete_attribute(&id, "minecraft.favicon", true);
             }
             if let Some(secure_chat) = response.enforcesSecureChat {
-                set_if_unchanged!("minecraft.enforces_secure_chat", AttributeValue::Boolean(secure_chat));
+                set_if_unchanged!("minecraft.enforces_secure_chat", AttributeValue::Custom(ByteCode::Bool(secure_chat)));
                 if secure_chat {
-                    set_if_unchanged!("minecraft.retarded", AttributeValue::Unit);
+                    set_if_unchanged!("minecraft.retarded", AttributeValue::Custom(ByteCode::Unit));
                 } else {
                     state.delete_attribute(&id, "minecraft.retarded", true);
                 }

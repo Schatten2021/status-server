@@ -32,56 +32,41 @@ impl State {
         }
     }
 }
-#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
-/// values that an attribute can have.
+#[derive(Default, Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
+/// A value an Attribute can have.
+/// 
+/// # Note
+/// This is `#[non_exhaustive]`, so that adding a new variant in the future isn't a breaking change.
 pub enum AttributeValue {
+    /// Marker variant only present to mark that an attribute exists.
     #[default]
-    /// Primarily meant for marker attributes.
-    /// Supposed to mark "This attribute exists".
-    Unit,
-    /// A Boolean value.
-    Boolean(bool),
-    /// Some sort of count.
-    Count(usize),
-    /// A date. Useful for keeping track when an element was seen.
-    Date(chrono::DateTime<chrono::Utc>),
-    /// A percentage of some kind.
+    Marker,
+    /// Some custom (or primitive) format
+    Custom(bytecode::ByteCode),
+    /// A DateTime.
+    /// 
+    /// This is very useful for [`crate::Component`]s that store the last seen time in the attributes.
+    Timestamp(chrono::DateTime<chrono::Utc>),
+    /// A percentage.
     Percentage(f32),
-    /// A list of [`AttributeValue`]s.
-    List(Vec<AttributeValue>),
-    /// Some sort of number
-    Number(i128),
-    /// Some string.
-    String(String),
-    /// An enum variant.
-    Enum {
-        /// The identifier of the variant.
-        variant: String,
-        /// The actual value of the variant.
-        value: Box<AttributeValue>,
-    },
-    /// A map mapping one [`AttributeValue`] to another.
-    Map(Vec<(AttributeValue, AttributeValue)>)
+    /// A history over (previous) values.
+    History(Vec<(chrono::DateTime<chrono::Utc>, AttributeValue)>),
 }
 impl std::fmt::Display for AttributeValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeValue::Unit => write!(f, "()"),
-            AttributeValue::Boolean(bool) => bool.fmt(f),
-            AttributeValue::Count(num) => num.fmt(f),
-            AttributeValue::Date(date) => date.format("%d.%m.%Y %H:%M:%S%.3f").fmt(f),
-            AttributeValue::Percentage(v) => write!(f, "{:.2}", v * 100.0),
-            AttributeValue::List(list) => write!(f, "[{}]", list.iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>().join(", ")),
-            AttributeValue::Number(num) => num.fmt(f),
-            AttributeValue::String(str) => str.fmt(f),
-            AttributeValue::Enum { variant, value } => write!(f, "{variant}: {value}"),
-            AttributeValue::Map(map) => write!(f, "{{{}}}", map.iter()
-                .map(|(k, v)| format!("{k}: {v}"))
-                .collect::<Vec<_>>()
-                .join(", ")
-            )
+            AttributeValue::Marker => Ok(()),
+            AttributeValue::Custom(inner) => inner.fmt(f),
+            AttributeValue::Timestamp(dt) => dt.format("%d.%m.%Y %H:%M:%S%.3f").fmt(f),
+            AttributeValue::Percentage(val) => write!(f, "{:.2}%", val * 100.0),
+            AttributeValue::History(history) => {
+                for (timestamp, value) in history {
+                    timestamp.format("%d.%m.%Y %H:%M:%S%.3f").fmt(f)?;
+                    writeln!(f, ": {value},")?;
+                }
+                Ok(())
+            }
         }
     }
 }
