@@ -1,6 +1,6 @@
 //! utilities to enable easier filtering of messages for [`server::StatusProvider`].
 
-use server::{Notification, NotificationReason};
+use server::{AttributeValueChange, Notification, NotificationReason};
 use std::hash::Hash;
 
 const fn always() -> bool { true }
@@ -203,12 +203,10 @@ impl Filtering<NotificationReason> for StateChange {
                 NotificationReason::NewElement(status)
                 if filter.matches(status)),
             Self::CreateEntity => matches!(reason, NotificationReason::NewElement(_)),
-            Self::AttributeChange(change) => match reason {
-                NotificationReason::AttributeCreated(id, _) |
-                NotificationReason::AttributeChanged(id, _, _) |
-                NotificationReason::AttributeDeleted(id, _) => change.event.matches(reason) && change.id.as_ref()
-                    .is_none_or(|v| v.matches(id)),
-                _ => false,
+            Self::AttributeChange(change) => {
+                let NotificationReason::AttributeEdit(edit) = reason else { return false; };
+                change.id.as_ref().is_none_or(|v| v.matches(&edit.id)) &&
+                    change.event.matches(&edit.change)
             }
         }
     }
@@ -222,22 +220,21 @@ impl Filtering<String> for AttributeIdMatcher {
         }
     }
 }
-impl Filtering<NotificationReason> for AttributeEvent {
-    fn matches(&self, value: &NotificationReason) -> bool {
-        !matches!(value, NotificationReason::NewElement(_) | NotificationReason::OnlineStatusChanged(_)) &&
-            matches!((self, value),
-                (Self::Any, _) |
-                (Self::Create, NotificationReason::AttributeCreated(_, _)) |
-                (Self::Change, NotificationReason::AttributeChanged(_, _, _)) |
-                (Self::Delete, NotificationReason::AttributeDeleted(_, _))
-            )
+impl Filtering<AttributeValueChange> for AttributeEvent {
+    fn matches(&self, value: &AttributeValueChange) -> bool {
+        matches!((self, value),
+            (Self::Any, _) |
+            (Self::Create, AttributeValueChange::Create(_)) |
+            (Self::Change, AttributeValueChange::Edit(_, _)) |
+            (Self::Delete, AttributeValueChange::Delete(_))
+        )
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::parse_test;
     use super::*;
+    use crate::parse_test;
     use toml::toml;
     macro_rules! behavior_test {
         ($(#[$meta:meta])* $test_name:ident($test_type:ty: $conf:expr)::$func:ident: $($target_result:ident $check:expr),* $(,)?) => {
@@ -349,7 +346,7 @@ mod test {
         }
         mod behavior {
             use super::*;
-            use server::{Notification, NotificationReason, AttributeValue};
+            use server::{AttributeEdit, AttributeValue, AttributeValueChange, Notification, NotificationReason};
             behavior_test!(test1(Filter: toml!{
                 component.allow = ["foo"]
                 component.deny = ["bar", "foo"]
@@ -402,32 +399,50 @@ mod test {
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "foo".to_string(),
+                        change: AttributeValueChange::Create(AttributeValue::Marker)
+                    }),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "foo".to_string(),
+                        change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker)
+                    }),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "foo".to_string(),
+                        change: AttributeValueChange::Delete(AttributeValue::Marker)
+                    }),
                 },
                 denies Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("foo.bar".to_string(), AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "foo.bar".to_string(),
+                        change: AttributeValueChange::Create(AttributeValue::Marker)
+                    }),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("bar".to_string(), AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "bar".to_string(),
+                        change: AttributeValueChange::Create(AttributeValue::Marker)
+                    }),
                 },
                 allows Notification {
                     component_id: "foo".to_string(),
                     element_id: "foo".to_string(),
-                    reason: NotificationReason::AttributeCreated("bar.foo".to_string(), AttributeValue::Marker),
+                    reason: NotificationReason::AttributeEdit(AttributeEdit {
+                        id: "bar.foo".to_string(),
+                        change: AttributeValueChange::Create(AttributeValue::Marker)
+                    }),
                 },
             );
         }
@@ -501,7 +516,7 @@ mod test {
     }
     mod state_change {
         use super::*;
-        use server::{NotificationReason, AttributeValue};
+        use server::{AttributeValue, NotificationReason};
         mod parse {
             use super::*;
             parse_test!(empty(StateChange): toml::Table::new() => error);
@@ -526,12 +541,22 @@ mod test {
         }
         mod behavior {
             use super::*;
+            use server::{AttributeEdit, AttributeValueChange};
             behavior_test! {create(StateChange: toml::Value::String("create".to_string()))::matches:
                 allows NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -540,9 +565,18 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -551,9 +585,18 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -562,9 +605,18 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -573,9 +625,18 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                allows NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -584,9 +645,18 @@ mod test {
             })::matches:
                 allows NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 allows NotificationReason::OnlineStatusChanged(true),
                 allows NotificationReason::OnlineStatusChanged(false),
             }
@@ -595,9 +665,18 @@ mod test {
             })::matches:
                 allows NotificationReason::NewElement(true),
                 denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 allows NotificationReason::OnlineStatusChanged(true),
                 denies NotificationReason::OnlineStatusChanged(false),
             }
@@ -606,25 +685,21 @@ mod test {
             })::matches:
                 denies NotificationReason::NewElement(true),
                 allows NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Create(AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                }),
+                denies NotificationReason::AttributeEdit(AttributeEdit {
+                    id: "foo".to_string(),
+                    change: AttributeValueChange::Delete(AttributeValue::Marker)
+                }),
                 denies NotificationReason::OnlineStatusChanged(true),
                 allows NotificationReason::OnlineStatusChanged(false),
             }
-
-            // template
-            // behavior_test!{attribute_change(StateChange: toml!{
-            //     attribute.event = "create"
-            // })::matches:
-            //     denies NotificationReason::NewElement(true),
-            //     denies NotificationReason::NewElement(false),
-            //     denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-            //     denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-            //     denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
-            //     denies NotificationReason::OnlineStatusChanged(true),
-            //     denies NotificationReason::OnlineStatusChanged(false),
-            // }
         }
     }
     mod online_state_change {
@@ -731,45 +806,29 @@ mod test {
     }
     mod attribute_event {
         use super::*;
-        use server::{NotificationReason, AttributeValue};
+        use server::AttributeValue;
         // No parsing, because that's trivial.
         mod behavior {
             use super::*;
             behavior_test!(create(AttributeEvent: toml::Value::String("create".to_string()))::matches:
-                denies NotificationReason::NewElement(true),
-                denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::OnlineStatusChanged(true),
-                denies NotificationReason::OnlineStatusChanged(false),
+                allows AttributeValueChange::Create(AttributeValue::Marker),
+                denies AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                denies AttributeValueChange::Delete(AttributeValue::Marker),
             );
             behavior_test!(change(AttributeEvent: toml::Value::String("change".to_string()))::matches:
-                denies NotificationReason::NewElement(true),
-                denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                denies NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::OnlineStatusChanged(true),
-                denies NotificationReason::OnlineStatusChanged(false),
+                denies AttributeValueChange::Create(AttributeValue::Marker),
+                allows AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                denies AttributeValueChange::Delete(AttributeValue::Marker),
             );
             behavior_test!(delete(AttributeEvent: toml::Value::String("delete".to_string()))::matches:
-                denies NotificationReason::NewElement(true),
-                denies NotificationReason::NewElement(false),
-                denies NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::OnlineStatusChanged(true),
-                denies NotificationReason::OnlineStatusChanged(false),
+                denies AttributeValueChange::Create(AttributeValue::Marker),
+                denies AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                allows AttributeValueChange::Delete(AttributeValue::Marker),
             );
             behavior_test!(any(AttributeEvent: toml::Value::String("any".to_string()))::matches:
-                denies NotificationReason::NewElement(true),
-                denies NotificationReason::NewElement(false),
-                allows NotificationReason::AttributeCreated("foo".to_string(), AttributeValue::Marker),
-                allows NotificationReason::AttributeChanged("foo".to_string(), AttributeValue::Marker, AttributeValue::Marker),
-                allows NotificationReason::AttributeDeleted("foo".to_string(), AttributeValue::Marker),
-                denies NotificationReason::OnlineStatusChanged(true),
-                denies NotificationReason::OnlineStatusChanged(false),
+                allows AttributeValueChange::Create(AttributeValue::Marker),
+                allows AttributeValueChange::Edit(AttributeValue::Marker, AttributeValue::Marker),
+                allows AttributeValueChange::Delete(AttributeValue::Marker),
             );
         }
     }

@@ -1,6 +1,6 @@
 use lettre::transport::smtp::authentication::Credentials;
 use utils::Never;
-use server::{Component, ComponentHandle, Notification, NotificationProvider, NotificationReason};
+use server::{AttributeValueChange, Component, ComponentHandle, Notification, NotificationProvider, NotificationReason};
 use crate::filters::Filter;
 
 fn default_name() -> String { "No Reply".to_string() }
@@ -95,18 +95,20 @@ impl NotificationProvider for EmailNotificationProvider {
                 format!("{} went offline", notification.element_id),
                 format!(r"<h1><code>{}</code> just went offline!</h1> Go check up on it!", notification.element_id)
             ),
-            NotificationReason::AttributeCreated(attr, val) => (
-                format!("{} just got the attribute {}", notification.element_id, attr),
-                format!("The new value of <code>{}</code> for {} is: {}", attr, notification.element_id, val)
-            ),
-            NotificationReason::AttributeChanged(id, old, new) => (
-                format!("{id} of {} just changed value", notification.element_id),
-                format!("{id} of {} just changed from {old} to {new}", notification.element_id)
-            ),
-            NotificationReason::AttributeDeleted(id, val) => (
-                format!("{id} of {} just got deleted", notification.element_id),
-                format!("{id} of {} just got deleted ({val})", notification.element_id)
-            ),
+            NotificationReason::AttributeEdit(edit) => match &edit.change {
+                AttributeValueChange::Create(val) => (
+                    format!("{} just got the attribute {}", notification.element_id, edit.id),
+                    format!("The new value of <code>{}</code> for {} is: {}", edit.id, notification.element_id, val)
+                ),
+                AttributeValueChange::Edit(old, new) => (
+                    format!("{} of {} just changed value", edit.id, notification.element_id),
+                    format!("{} of {} just changed from {old} to {new}", edit.id, notification.element_id)
+                ),
+                AttributeValueChange::Delete(old) => (
+                    format!("{} of {} just got deleted", edit.id, notification.element_id),
+                    format!("{} of {} just got deleted ({old})", edit.id, notification.element_id)
+                ),
+            },
             NotificationReason::NewElement(true) => (
                 format!("{} just got created (online)", notification.element_id),
                 format!("just got word that {} exists and is online.", notification.element_id)

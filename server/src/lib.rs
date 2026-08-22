@@ -50,6 +50,8 @@ pub use component::{
 pub use notification::{
     Notification,
     NotificationReason,
+    AttributeEdit,
+    AttributeValueChange,
 };
 pub use state::{
     State,

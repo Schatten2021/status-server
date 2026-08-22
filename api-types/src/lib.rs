@@ -226,18 +226,14 @@ pub mod websocket {
             match value {
                 server::NotificationReason::OnlineStatusChanged(new) => Self::OnlineStatus(OnlineStatusChange::Change(new)),
                 server::NotificationReason::NewElement(state) => Self::OnlineStatus(OnlineStatusChange::Create(state)),
-                server::NotificationReason::AttributeCreated(id, val) => Self::Attribute(AttributeMessage {
-                    attribute_id: id,
-                    change: AttributeChange::Create(val.into()),
+                server::NotificationReason::AttributeEdit(edit) => Self::Attribute(AttributeMessage {
+                    attribute_id: edit.id,
+                    change: match edit.change {
+                        server::AttributeValueChange::Create(val) => AttributeChange::Create(val.into()),
+                        server::AttributeValueChange::Edit(_, val) => AttributeChange::Change(val.into()),
+                        server::AttributeValueChange::Delete(_) => AttributeChange::Delete,
+                    }
                 }),
-                server::NotificationReason::AttributeChanged(id, _, new) => Self::Attribute(AttributeMessage {
-                    attribute_id: id,
-                    change: AttributeChange::Change(new.into()),
-                }),
-                server::NotificationReason::AttributeDeleted(id, _) => Self::Attribute(AttributeMessage {
-                    attribute_id: id,
-                    change: AttributeChange::Delete,
-                })
             }
         }
     }

@@ -77,7 +77,7 @@ impl yew::Component for App {
                 ApiResponse::Ok(v) => AppState::from(v),
                 ApiResponse::ServerError(e) => {
                     error!("server error `{}`: {}", e.id, e.message);
-                    todo!();
+                    return;
                 }
                 ApiResponse::ClientError(()) => panic!("something went wrong...")
             };

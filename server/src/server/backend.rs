@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use untyped::{TypeMap, Untyped};
 use crate::config::Config;
 use crate::Component;
-use crate::notification::{Notification, NotificationReason};
+use crate::notification::{AttributeEdit, AttributeValueChange, Notification, NotificationReason};
 use crate::notification_provider::NotificationProvider;
 use crate::state::{AttributeValue, State};
 
@@ -237,10 +237,13 @@ impl Server {
         let notification = Notification::new(
             component_id.to_string(),
             element_id.to_string(),
-            match old_val {
-                Some(old) => NotificationReason::AttributeChanged(attribute_id.to_string(), old, value),
-                None => NotificationReason::AttributeCreated(attribute_id.to_string(), value),
-            }
+            NotificationReason::AttributeEdit(AttributeEdit {
+                id: attribute_id.to_string(),
+                change: match old_val {
+                    Some(old) => AttributeValueChange::Edit(old, value),
+                    None => AttributeValueChange::Create(value)
+                }
+            })
         );
         self.notify(notification);
     }
@@ -255,7 +258,10 @@ impl Server {
                 self.notify(Notification::new(
                     component_id.to_string(),
                     element_id.to_string(),
-                    NotificationReason::AttributeDeleted(attribute_id.to_string(), old))
+                    NotificationReason::AttributeEdit(AttributeEdit {
+                        id: attribute_id.to_string(),
+                        change: AttributeValueChange::Delete(old),
+                    }))
                 );
             }
             return;
@@ -274,7 +280,10 @@ impl Server {
             .for_each(|(id, old)| self.notify(Notification::new(
                 component_id.to_string(),
                 element_id.to_string(),
-                NotificationReason::AttributeDeleted(id, old))
+                NotificationReason::AttributeEdit(AttributeEdit {
+                    id,
+                    change: AttributeValueChange::Delete(old),
+                }))
             ));
     }
     pub(crate) fn online_status_changed(&mut self, component_id: &'static str, element_id: &str, new_status: bool) {

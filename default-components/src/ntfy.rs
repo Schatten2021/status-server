@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use utils::Never;
-use server::{ComponentHandle, Notification, NotificationReason};
+use server::{AttributeValueChange, ComponentHandle, Notification, NotificationReason};
 use crate::filters::Filter;
 
 fn default_message() -> String {
@@ -108,35 +108,43 @@ impl server::NotificationProvider for NtfyNotificationProvider {
             ("reason_short".to_string(), match &notification.reason {
                 NotificationReason::OnlineStatusChanged(true) => "went online".to_string(),
                 NotificationReason::OnlineStatusChanged(false) => "went offline".to_string(),
-                NotificationReason::AttributeCreated(id, _) => format!("got attribute {id}"),
-                NotificationReason::AttributeChanged(id, _, _) => format!("attribute {id} changed"),
-                NotificationReason::AttributeDeleted(id, _) => format!("attribute {id} got deleted"),
+                NotificationReason::AttributeEdit(edit) => match &edit.change {
+                    AttributeValueChange::Create(_) => format!("got attribute {}", edit.id),
+                    AttributeValueChange::Edit(_, _) => format!("attribute {} changed", edit.id),
+                    AttributeValueChange::Delete(_) => format!("attribute {} got deleted", edit.id),
+                }
                 NotificationReason::NewElement(true) => "created (online)".to_string(),
                 NotificationReason::NewElement(false) => "created (offline)".to_string(),
             }),
             ("reason_long".to_string(), match &notification.reason {
                 NotificationReason::OnlineStatusChanged(true) => "went online".to_string(),
                 NotificationReason::OnlineStatusChanged(false) => "went offline".to_string(),
-                NotificationReason::AttributeCreated(id, val) => format!("attribute {id} got created ({val})"),
-                NotificationReason::AttributeChanged(id, old, new) => format!("attribute {id} got changed ({old} => {new})"),
-                NotificationReason::AttributeDeleted(id, old) => format!("attribute {id} got deleted ({old})"),
+                NotificationReason::AttributeEdit(edit) => match &edit.change {
+                    AttributeValueChange::Create(val) => format!("attribute {} got created ({val})", edit.id),
+                    AttributeValueChange::Edit(old, new) => format!("attribute {} got changed ({old} => {new})", edit.id),
+                    AttributeValueChange::Delete(old) => format!("attribute {} got deleted ({old})", edit.id),
+                }
                 NotificationReason::NewElement(true) => "got created and went online".to_string(),
                 NotificationReason::NewElement(false) => "got created and went offline".to_string(),
             }),
             ("attr_new_value".to_string(), match &notification.reason {
-                NotificationReason::AttributeCreated(_, val) |
-                NotificationReason::AttributeChanged(_, _, val)=> val.to_string(),
+                NotificationReason::AttributeEdit(edit) => match &edit.change {
+                    AttributeValueChange::Create(new) |
+                    AttributeValueChange::Edit(_, new) => new.to_string(),
+                    AttributeValueChange::Delete(_) => String::new(),
+                }
                 _ => String::new()
             }),
             ("attr_old_value".to_string(), match &notification.reason {
-                NotificationReason::AttributeChanged(_, val, _) |
-                NotificationReason::AttributeDeleted(_, val) => val.to_string(),
+                NotificationReason::AttributeEdit(edit) => match &edit.change {
+                    AttributeValueChange::Delete(old) |
+                    AttributeValueChange::Edit(old, _) => old.to_string(),
+                    AttributeValueChange::Create(_) => String::new(),
+                }
                 _ => String::new(),
             }),
             ("attr_id".to_string(), match &notification.reason {
-                NotificationReason::AttributeCreated(id, _) |
-                NotificationReason::AttributeChanged(id, _, _) |
-                NotificationReason::AttributeDeleted(id, _) => id.clone(),
+                NotificationReason::AttributeEdit(edit) => edit.id.clone(),
                 _ => String::new(),
             }),
             ("status_new".to_string(), match &notification.reason {
