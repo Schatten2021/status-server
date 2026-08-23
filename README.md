@@ -66,6 +66,7 @@ can use `email.status`; NOTE: `notify` are also aliased as `notifications`). The
 | minecraft  | `minecraft` | `status`   | minecraft-status    | [ref](docs/config/minecraft.md)  |
 | website    | `website`   | `status`   | website-status      | [ref](docs/config/website.md)    |
 | dataminer  | `miner`     | `status`   | dataminer-status    | [ref](docs/config/dataminer.md)  |
+| names      | `names`     | none       | names               | [ref](docs/config/names.md)      |
 
 Additionally, many configurations use [filters](docs/config/filter.md) to provide a uniform filtering interface.
 
