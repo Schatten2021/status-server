@@ -425,9 +425,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.5.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
+checksum = "8498c871161e1742aaa9d52551b2d6ebdd4c3d45a3be423e3728f33b955be550"
 dependencies = [
  "cfg-if",
 ]
@@ -2237,6 +2237,7 @@ dependencies = [
  "chrono",
  "parking_lot",
  "serde",
+ "tokio",
  "toml",
  "tracing",
  "untyped",
@@ -2825,9 +2826,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "untyped"
-version = "0.3.2"
+version = "0.4.1"
 source = "sparse+https://kellnr.fms.nrw/api/v1/crates/"
-checksum = "77be53eccf60955b403e7b094bcddb3741a0c8b00037ed34f5bdb7b34f95724b"
+checksum = "8c811f7c89ed62563b8db9247c159e82cf7b8bfebd9c65ecbaf232621adc7201"
 dependencies = [
  "utils 0.4.0",
 ]
