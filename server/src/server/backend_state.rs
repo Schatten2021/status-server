@@ -43,7 +43,7 @@ unsafe fn try_handle_request<C: Component>(this: &Untyped, request: axum::extrac
 unsafe fn notify_provider<P: NotificationProvider>(this: &Untyped, notification: Notification) {
     // SAFETY: The correctness of the type is guaranteed by the caller.
     unsafe {
-        <Untyped as Container<P>>::read(&this).notify(notification)
+        <Untyped as Container<P>>::read(this).notify(notification);
     }
 }
 
@@ -268,7 +268,7 @@ impl GlobalState {
             id: C::ID,
             notification_provider_info: None,
         };
-        if let Some(_) = self.components.write().insert(component, data) {
+        if self.components.write().insert(component, data).is_some() {
             error!("inserted component `{}` twice!", C::ID);
         }
     }
