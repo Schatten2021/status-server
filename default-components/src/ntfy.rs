@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use bytecode::ByteCode;
 use utils::Never;
-use server::{AttributeValueChange, ComponentHandle, Notification, NotificationReason};
+use server::{AttributeValue, AttributeValueChange, ComponentHandle, Notification, NotificationReason};
 use crate::filters::Filter;
 
 fn default_message() -> String {
-    "{element_id} {reason_long}".to_string()
+    "{element} {reason_long}".to_string()
 }
 
 // TODO: support actions?
@@ -80,16 +81,18 @@ impl From<&Config> for NotificationBody {
 /// [`NotificationProvider`] to send notifications via [NTFY](https://ntfy.sh).
 pub struct NtfyNotificationProvider {
     config: Vec<Config>,
+    handle: ComponentHandle,
 }
 impl server::Component for NtfyNotificationProvider {
     const ID: &'static str = "ntfy";
     type Config = crate::Notification<Vec<Config>>;
     type ConfigError = Never;
 
-    fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+    fn init(handle: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
         let config = config.notification;
         Ok(Self {
             config,
+            handle,
         })
     }
 
@@ -105,6 +108,10 @@ impl server::NotificationProvider for NtfyNotificationProvider {
         let mut format_values = HashMap::from([
             ("component_id".to_string(), notification.component_id.clone()),
             ("element_id".to_string(), notification.element_id.clone()),
+            ("element".to_string(), match self.handle.get_attribute(&notification.element_id, "name") {
+                Some(AttributeValue::Custom(ByteCode::String(name))) => name,
+                _ =>  notification.element_id.clone(),
+            }),
             ("reason_short".to_string(), match &notification.reason {
                 NotificationReason::OnlineStatusChanged(true) => "went online".to_string(),
                 NotificationReason::OnlineStatusChanged(false) => "went offline".to_string(),
@@ -166,7 +173,10 @@ impl server::NotificationProvider for NtfyNotificationProvider {
             }
             debug!("sending ntfy notification to {}", config.base);
             let title = config.title.as_ref().map(|t| {
-                t.format(&format_values).unwrap_or_else(|_| t.clone())
+                t.format(&format_values).unwrap_or_else(|e| {
+                    error!("couldn't format message: {e}");
+                    t.clone()
+                })
             });
             let message = config.message.format(&format_values).unwrap_or_else(|_| config.message.clone());
 

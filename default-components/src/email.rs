@@ -1,6 +1,7 @@
+use bytecode::ByteCode;
 use lettre::transport::smtp::authentication::Credentials;
 use utils::Never;
-use server::{AttributeValueChange, Component, ComponentHandle, Notification, NotificationProvider, NotificationReason};
+use server::{AttributeValue, AttributeValueChange, Component, ComponentHandle, Notification, NotificationProvider, NotificationReason};
 use crate::filters::Filter;
 
 fn default_name() -> String { "No Reply".to_string() }
@@ -57,10 +58,11 @@ impl Subscriber {
         }
     }
 }
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 /// [`NotificationProvider`] to send notifications via E-Mail.
 pub struct EmailNotificationProvider {
     config: Config,
+    handle: ComponentHandle,
     credentials: Credentials,
 }
 
@@ -69,10 +71,11 @@ impl Component for EmailNotificationProvider {
     type Config = crate::Notification<Config>;
     type ConfigError = Never;
 
-    fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+    fn init(handle: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
         let config = config.notification;
         Ok(Self {
             credentials: Credentials::new(config.address.clone(), config.password.clone()),
+            handle,
             config,
         })
     }
@@ -86,36 +89,40 @@ impl Component for EmailNotificationProvider {
 impl NotificationProvider for EmailNotificationProvider {
     fn notify(&self, notification: Notification) {
         if !self.config.filter.allows(&notification) { return; }
+        let name = match self.handle.get_attribute(&notification.element_id, "name") {
+            Some(AttributeValue::Custom(ByteCode::String(name))) => name,
+            _ => notification.element_id.clone(),
+        };
         let (subject, body) = match &notification.reason {
             NotificationReason::OnlineStatusChanged(true) => (
-                format!("{} went online", notification.element_id),
-                format!(r"<h1> <code>{}</code> just went online</h1>Everything is fine", notification.element_id)
+                format!("{name} went online"),
+                format!(r"<h1> <code>{name}</code> just went online</h1>Everything is fine")
             ),
             NotificationReason::OnlineStatusChanged(false) => (
-                format!("{} went offline", notification.element_id),
-                format!(r"<h1><code>{}</code> just went offline!</h1> Go check up on it!", notification.element_id)
+                format!("{name} went offline"),
+                format!(r"<h1><code>{name}</code> just went offline!</h1> Go check up on it!")
             ),
             NotificationReason::AttributeEdit(edit) => match &edit.change {
                 AttributeValueChange::Create(val) => (
-                    format!("{} just got the attribute {}", notification.element_id, edit.id),
-                    format!("The new value of <code>{}</code> for {} is: {}", edit.id, notification.element_id, val)
+                    format!("{name} just got the attribute {}", edit.id),
+                    format!("The new value of {name}(<code>{}</code>) for {} is: {}", edit.id, notification.element_id, val)
                 ),
                 AttributeValueChange::Edit(old, new) => (
-                    format!("{} of {} just changed value", edit.id, notification.element_id),
-                    format!("{} of {} just changed from {old} to {new}", edit.id, notification.element_id)
+                    format!("{} of {name} just changed value", edit.id),
+                    format!("{} of {name} just changed from {old} to {new}", edit.id)
                 ),
                 AttributeValueChange::Delete(old) => (
-                    format!("{} of {} just got deleted", edit.id, notification.element_id),
-                    format!("{} of {} just got deleted ({old})", edit.id, notification.element_id)
+                    format!("{} of {name} just got deleted", edit.id),
+                    format!("{} of {name} just got deleted ({old})", edit.id)
                 ),
             },
             NotificationReason::NewElement(true) => (
-                format!("{} just got created (online)", notification.element_id),
-                format!("just got word that {} exists and is online.", notification.element_id)
+                format!("{name} just got created (online)"),
+                format!("just got word that {name} exists and is online.")
             ),
             NotificationReason::NewElement(false) => (
-                format!("{} just got created (offline)", notification.element_id),
-                format!("just got word that {} exists and is offline.", notification.element_id)
+                format!("{name} just got created (offline)"),
+                format!("just got word that {name} exists and is offline.")
             ),
         };
         let cloned = self.clone();

@@ -32,6 +32,7 @@ impl Component for Names {
         for (id, name) in &config.names {
             server.change_attribute(id, NAME_ATTRIBUTE_ID, AttributeValue::Custom(ByteCode::String(name.clone())));
         }
+        debug!("set names");
         Ok(Self(config, server))
     }
 
@@ -41,6 +42,7 @@ impl Component for Names {
             self.1.change_attribute(id, NAME_ATTRIBUTE_ID, AttributeValue::Custom(ByteCode::String(name.clone())));
         }
         self.0 = config;
+        debug!("updated names");
         Ok(())
     }
 }

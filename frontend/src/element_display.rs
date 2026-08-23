@@ -1,3 +1,4 @@
+use bytecode::ByteCode;
 use yew::Html;
 use api_types::AttributeValue;
 
@@ -9,11 +10,16 @@ pub struct Props {
 
 #[function_component(ElementDisplay)]
 pub fn element_display(props: &Props) -> Html {
+    let name = match props.element.attributes.get("name") {
+        Some(AttributeValue::Custom(ByteCode::String(name))) => name,
+        _ => &props.id,
+    };
     html!{
         <div class={if props.element.online {"element element-online"} else { "element element-offline" }}>
-            <h2><b class={if props.element.online { "status-online status" } else { "status-offline status" }}>{"⬤"}</b>{"   "}{&props.id}</h2>
+            <h2><b class={if props.element.online { "status-online status" } else { "status-offline status" }}>{"⬤"}</b>{"   "}{name}</h2>
             <div class="attributes">{
                 props.element.attributes.iter()
+                    .filter(|(id, _)| !matches!(id.as_str(), "name"))
                     .map(|(a, b)| (a.clone(), b.clone()))
                     .map(|(id, val)| html!(<AttributeDisplay id={id} value={val}/>))
                     .collect::<Html>()

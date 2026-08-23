@@ -18,6 +18,7 @@ Additionally, `title` and `message` are formatted strings with the following arg
 | arg            | description                                                                                    |
 |----------------|------------------------------------------------------------------------------------------------|
 | component_id   | id of the component that triggered the Notification                                            |
+| element        | name of the element (if set), otherwise the element_id.                                        |
 | element_id     | id of the element that was changed                                                             |
 | reason_short   | short version of the reason (meant for titles/etc.)                                            |
 | reason_long    | long version of the reason (contains old & new value of attribute changes)                     |
