@@ -28,7 +28,7 @@ impl ServerHandle {
     /// # Note
     /// Notification providers need to be registered via [`Self::add_notification_provider`],
     /// so that the server knows that they can send notifications.
-    // #[expect(clippy::must_use_candidate, reason="returning something here is more just for chaining.")]
+    #[expect(clippy::must_use_candidate, reason="returning something here is more just for chaining.")]
     pub fn add_component<C: Component>(&self) -> &Self {
         self.0.add_component::<C>(self.provider_handle::<C>());
         self
@@ -40,7 +40,7 @@ impl ServerHandle {
         self
     }
     /// Adds a new [`NotificationProvider`] to the server.
-    // #[expect(clippy::must_use_candidate, reason="returning something here is more just for chaining.")]
+    #[expect(clippy::must_use_candidate, reason="returning something here is more just for chaining.")]
     pub fn add_notification_provider<P: NotificationProvider>(&self) -> &Self {
         self.0.add_notification_provider::<P>(self.provider_handle::<P>());
         self
