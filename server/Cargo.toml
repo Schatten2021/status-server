@@ -6,7 +6,7 @@ edition = "2024"
 [features]
 
 [dependencies]
-untyped = { version = "0.3", registry = "kellnr", features = ["type-map"] }
+untyped = { version = "0.4", registry = "kellnr", features = ["type-map"] }
 serde.workspace = true
 parking_lot = { workspace = true, features = ["arc_lock"] }
 chrono = { workspace = true, features = ["serde"] }
@@ -15,3 +15,4 @@ toml.workspace = true
 axum.workspace = true
 async-trait.workspace = true
 bytecode = { workspace = true, features = ["serde"] }
+tokio.workspace = true
