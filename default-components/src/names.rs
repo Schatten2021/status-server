@@ -41,6 +41,10 @@ impl Component for Names {
             if self.0.names.get(id) == Some(name) { continue; }
             self.1.change_attribute(id, NAME_ATTRIBUTE_ID, AttributeValue::Custom(ByteCode::String(name.clone())));
         }
+        for id in self.0.names.keys() {
+            if config.names.contains_key(id) { continue; }
+            self.1.delete_attribute(id, NAME_ATTRIBUTE_ID, false);
+        }
         self.0 = config;
         debug!("updated names");
         Ok(())
