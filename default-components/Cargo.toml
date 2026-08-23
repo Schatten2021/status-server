@@ -17,16 +17,19 @@ email-notifications = ["filters", "dep:lettre", "dep:tokio"]
 dataminer-status = ["dep:chrono", "dep:tokio", "dep:axum"]
 minecraft-status = ["dep:chrono", "dep:serde_json", "dep:minecraft-net", "dep:tokio"]
 website-status = ["filters", "dep:reqwest", "dep:chrono", "dep:tokio"]
+# other
+names = []
 
 # definitions for better mass importing
 all-utils = ["filters"]
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
+all-other = ["names"]
 all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
-all = ["all-utils", "all-status", "all-notifications"]
-default = ["all-status", "all-notifications"]
+all = ["all-utils", "all-status", "all-notifications", "all-other"]
+default = ["all-status", "all-notifications", "all-other"]
 
 [dependencies]
 # used in basically every scenario

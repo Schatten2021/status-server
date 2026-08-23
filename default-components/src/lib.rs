@@ -47,6 +47,7 @@ featured_use!(if "dataminer-status": dataminer::DataminerStatus);
 featured_use!(if "minecraft-status": minecraft::MinecraftStatus);
 featured_use!(if "email-notifications": email::EmailNotificationProvider);
 featured_use!(if "ntfy-notifications": ntfy::NtfyNotificationProvider);
+featured_use!(if "names": names::Names);
 
 #[cfg(test)]
 #[macro_export]

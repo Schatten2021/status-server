@@ -39,6 +39,7 @@ pub fn check(path_: &PathBuf) -> Result<(), ()> {
     component!(if "dataminer-status": DataminerStatus);
     component!(if "minecraft-status": MinecraftStatus);
     component!(if "website-status": WebsiteStatuse);
+    component!(if "names": Names);
     if ok {
         info!("all config is OK");
         Ok(())

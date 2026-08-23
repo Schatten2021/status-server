@@ -37,6 +37,8 @@ pub fn start(config_file: PathBuf, host: &str, port: u16) {
             component!(if "dataminer-status": DataminerStatus);
             component!(if "minecraft-status": MinecraftStatus);
             component!(if "website-status": WebsiteStatuse);
+            
+            component!(if "names": Names);
 
             let router = axum::Router::new()
                 .route("/", any(server.clone()))

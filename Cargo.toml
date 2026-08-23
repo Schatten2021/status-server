@@ -19,6 +19,8 @@ email-notifications = ["default-components/email-notifications"]
 dataminer-status = ["default-components/dataminer-status"]
 minecraft-status = ["default-components/minecraft-status"]
 website-status = ["default-components/website-status"]
+# other
+names = ["default-components/names"]
 
 # helper features
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
@@ -26,7 +28,8 @@ all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
-all = ["all-status", "all-notifications"]
+all-other = ["names"]
+all = ["all-status", "all-notifications", "all-other"]
 
 default = ["all"]
 
