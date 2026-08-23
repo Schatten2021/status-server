@@ -118,7 +118,7 @@ impl ServerHandle {
     }
     /// sets the config path
     pub fn set_config_path(&self, path: PathBuf) {
-        self.0.write().set_config_path(path)
+        self.0.write().set_config_path(path);
     }
 }
 impl axum::handler::Handler<(), ()> for ServerHandle {

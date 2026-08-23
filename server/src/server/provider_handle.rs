@@ -156,6 +156,6 @@ impl ComponentHandle {
     }
     /// sets the config path
     pub fn set_config_path(&self, path: PathBuf) {
-        self.backend.write().set_config_path(path)
+        self.backend.write().set_config_path(path);
     }
 }
