@@ -71,6 +71,7 @@ pub(crate) enum Task {
     SendNotification(Notification),
     EditAttribute(EditAttribute),
     EditOnlineState(&'static str, String, bool),
+    Reconfigure,
 }
 pub(crate) struct EditAttribute {
     pub(crate) causing_component: &'static str,
@@ -120,18 +121,20 @@ impl GlobalState {
         std::thread::spawn(move || super::backend::backend_thread(receiver, this_, runtime));
         this
     }
+    pub(crate) fn enqueue(&self, task: Task) {
+        self.tasks.send(task)
+            .expect("unable to enqueue task");
+    }
 }
 // management of states
 impl GlobalState {
     pub(crate) fn set_attribute(&self, component_id: &'static str, element_id: &str, attribute_id: &str, value: AttributeValue) {
-        let task = Task::EditAttribute(EditAttribute {
+        self.enqueue(Task::EditAttribute(EditAttribute {
             causing_component: component_id,
             element_id: element_id.to_string(),
             attribute_id: attribute_id.to_string(),
             change: AttributeChange::Set(value),
-        });
-        self.tasks.send(task)
-            .expect("receiver disconnected even though there are still senders?");
+        }));
     }
     pub(crate) fn get_attribute(&self, element_id: &str, attribute_id: &str) -> Option<AttributeValue> {
         self.states.read()
@@ -144,14 +147,12 @@ impl GlobalState {
         if exact {
             if !element.attributes.contains_key(attribute_id) { return; }
             drop(state_lock);
-            let task = Task::EditAttribute(EditAttribute {
+            self.enqueue(Task::EditAttribute(EditAttribute {
                 causing_component: component_id,
                 element_id: element_id.to_string(),
                 attribute_id: attribute_id.to_string(),
                 change: AttributeChange::Delete,
-            });
-            self.tasks.send(task)
-                .expect("receiver disconnected even though there are still senders?");
+            }));
             return;
         }
         let attribute_ids = element.attributes.keys()
@@ -167,8 +168,7 @@ impl GlobalState {
             }))
             .collect::<Vec<_>>();
         for task in tasks {
-            self.tasks.send(task)
-                .expect("receiver disconnected even though there are still senders?");
+            self.enqueue(task);
         }
     }
     pub(crate) fn set_online_state(&self, component_id: &'static str, element_id: &str, state: bool) {
@@ -176,8 +176,7 @@ impl GlobalState {
         if let Some(element) = element_lock.get(component_id) && element.online == state {
             return;
         }
-        self.tasks.send(Task::EditOnlineState(component_id, element_id.to_string(), state))
-            .expect("receiver disconnected even though there are still senders?");
+        self.enqueue(Task::EditOnlineState(component_id, element_id.to_string(), state));
     }
     pub(crate) fn get_online_state(&self, element_id: &str) -> Option<bool> {
         self.states.read()
@@ -215,28 +214,7 @@ impl GlobalState {
         let new_config = Self::read_config(self.config_path.read().as_path());
         let mut config_lock = self.config.write();
         *config_lock = new_config;
-        let config = RwLockWriteGuard::downgrade(config_lock);
-        let mut component_lock = self.components.write();
-        let mut to_remove = HashSet::new();
-        for (component, info) in component_lock.entries_mut() {
-            if config.global.ignored.components.contains(info.id) {
-                to_remove.insert(info.type_id);
-                continue;
-            }
-            // SAFETY: The correctness of the types was established at creation time.
-            unsafe { (info.reconfigure)(component, config.configs.get(info.id).cloned()) }
-        }
-        while !to_remove.is_empty() {
-            let remove_this_round = to_remove;
-            to_remove = HashSet::new();
-            for current in remove_this_round {
-                let Some((_removed_component, removed_info)) = component_lock.remove_by_type_id(&current) else {
-                    error!("already removed component though it wasn't marked as removed?");
-                    continue;
-                };
-                to_remove.extend(removed_info.required_by);
-            }
-        }
+        self.enqueue(Task::Reconfigure);
     }
 }
 // management of components
@@ -250,7 +228,7 @@ impl GlobalState {
         if self.has_component::<C>() { debug!("already has component {}", C::ID); return; }
         let config = self.get_config::<C>()
             .unwrap_or_else(|| {
-                info!("no valid componnent {}", C::ID);
+                info!("no valid component {}", C::ID);
                 C::Config::default()
             });
         let component = match C::init(handle, config) {
