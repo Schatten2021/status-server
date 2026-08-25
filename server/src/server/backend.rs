@@ -1,6 +1,8 @@
+use std::collections::HashSet;
 use crate::server::backend_state::{AttributeChange, GlobalState, Task};
 use crate::{AttributeEdit, AttributeValueChange, Notification, NotificationReason};
 use std::sync::Arc;
+use parking_lot::RwLockWriteGuard;
 
 #[expect(clippy::needless_pass_by_value, reason="this function is semantically taking ownership. Also, we don't need it at the other place.")]
 pub fn backend_thread(channel: std::sync::mpsc::Receiver<Task>, backend: Arc<GlobalState>, tokio_handle: tokio::runtime::Handle) {
@@ -83,6 +85,30 @@ pub fn backend_thread(channel: std::sync::mpsc::Receiver<Task>, backend: Arc<Glo
                     reason,
                 }))
                     .expect("receiving channel dropped even though the receiver thread is still active and kicking? That doesn't make sense...");
+            },
+            Task::Reconfigure => {
+                let mut component_lock = backend.components.write();
+                let config = backend.config.read();
+                let mut to_remove = HashSet::new();
+                for (component, info) in component_lock.entries_mut() {
+                    if config.global.ignored.components.contains(info.id) {
+                        to_remove.insert(info.type_id);
+                        continue;
+                    }
+                    // SAFETY: The correctness of the types was established at creation time.
+                    unsafe { (info.reconfigure)(component, config.configs.get(info.id).cloned()) }
+                }
+                while !to_remove.is_empty() {
+                    let remove_this_round = to_remove;
+                    to_remove = HashSet::new();
+                    for current in remove_this_round {
+                        let Some((_removed_component, removed_info)) = component_lock.remove_by_type_id(&current) else {
+                            error!("already removed component though it wasn't marked as removed?");
+                            continue;
+                        };
+                        to_remove.extend(removed_info.required_by);
+                    }
+                }
             }
         }
     }
