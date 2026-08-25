@@ -2,7 +2,7 @@ use std::any::TypeId;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use parking_lot::{RwLock, RwLockWriteGuard};
+use parking_lot::RwLock;
 use serde::Deserialize;
 use untyped::{Container, TypeMap, Untyped};
 use crate::{AttributeValue, Component, ComponentHandle, Config, Notification, NotificationProvider};
