@@ -48,6 +48,7 @@ featured_use!(if "minecraft-status": minecraft::MinecraftStatus);
 featured_use!(if "email-notifications": email::EmailNotificationProvider);
 featured_use!(if "ntfy-notifications": ntfy::NtfyNotificationProvider);
 featured_use!(if "names": names::Names);
+featured_use!(if "history": history::History);
 
 #[cfg(test)]
 #[macro_export]

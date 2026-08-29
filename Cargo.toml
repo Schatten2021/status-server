@@ -11,7 +11,7 @@ publish = ["kellnr"]
 # api/web "notifications"
 api = ["default-components/api"]
 websockets = ["default-components/websockets"]
-frontend = ["default-components/frontend"]
+frontend = ["api", "websockets", "default-components/frontend"]
 # notifications
 ntfy-notifications = ["default-components/ntfy-notifications"]
 email-notifications = ["default-components/email-notifications"]
@@ -21,6 +21,9 @@ minecraft-status = ["default-components/minecraft-status"]
 website-status = ["default-components/website-status"]
 # other
 names = ["default-components/names"]
+# historization
+history = ["default-components/history"]
+history-fs-json-backend = ["history", "default-components/history-fs-json-backend"]
 
 # helper features
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
@@ -28,7 +31,7 @@ all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
-all-other = ["names"]
+all-other = ["names", "history", "history-fs-json-backend"]
 all = ["all-status", "all-notifications", "all-other"]
 
 default = ["all"]
@@ -66,3 +69,4 @@ toml = "1.1"
 server = { path = "server" }
 async-trait = "0.1"
 bytecode = { version = "0.2", registry = "kellnr" }
+thiserror = "2"

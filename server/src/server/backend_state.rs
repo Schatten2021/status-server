@@ -228,7 +228,7 @@ impl GlobalState {
         if self.has_component::<C>() { debug!("already has component {}", C::ID); return; }
         let config = self.get_config::<C>()
             .unwrap_or_else(|| {
-                info!("no valid component {}", C::ID);
+                info!("no valid config for component {}", C::ID);
                 C::Config::default()
             });
         let component = match C::init(handle, config) {

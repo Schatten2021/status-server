@@ -19,11 +19,16 @@ minecraft-status = ["dep:chrono", "dep:serde_json", "dep:minecraft-net", "dep:to
 website-status = ["filters", "dep:reqwest", "dep:chrono", "dep:tokio"]
 # other
 names = []
+#historization
+history = ["dep:thiserror"]
+history-fs-json-backend = ["history", "dep:serde_json"]
+
 
 # definitions for better mass importing
 all-utils = ["filters"]
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
-all-other = ["names"]
+all-other = ["names", "all-history-backends"]
+all-history-backends = ["history-fs-json-backend"]
 all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
@@ -43,6 +48,7 @@ bytecode.workspace = true
 tokio = { workspace = true, optional = true }
 reqwest = { version = "0.13", features = ["json"], optional = true } # NTFY, website-status
 chrono = { workspace = true, optional = true } # usually status providers
+thiserror = { workspace = true, optional = true }
 
 # API & frontend
 axum = { workspace = true, optional = true }

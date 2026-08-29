@@ -28,6 +28,7 @@ pub fn start(config_file: PathBuf, host: &str, port: u16) {
                 };
             }
             // do this at the start, so that notifications already have access to the names.
+            component!(if "history": notify History);
             component!(if "names": Names);
             component!(if "api": Api);
             component!(if "websockets": notify Websockets);
@@ -39,7 +40,6 @@ pub fn start(config_file: PathBuf, host: &str, port: u16) {
             component!(if "dataminer-status": DataminerStatus);
             component!(if "minecraft-status": MinecraftStatus);
             component!(if "website-status": WebsiteStatuse);
-            
 
             let router = axum::Router::new()
                 .route("/", any(server.clone()))
