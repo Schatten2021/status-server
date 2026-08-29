@@ -24,6 +24,14 @@ macro_rules! history_def {
 
         #[derive(Clone, Debug, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
         pub struct Config {
+            #[serde(alias="elements", alias="element", alias="element_filter", alias="filter_elements", alias="filtered_elements")]
+            #[serde(default)]
+            elements_filter: $crate::filters::SingleFilter<String>,
+
+            #[serde(alias="attributes", alias="attribute", alias="attribute_filter", alias="filter_attributes", alias="filtered_attributes")]
+            #[serde(default)]
+            attributes_filter: $crate::filters::SingleFilter<$crate::filters::AttributeIdMatcher>,
+
             $(
             #[cfg(feature = $feature)]
             #[serde(default)]
@@ -32,6 +40,8 @@ macro_rules! history_def {
         }
         $(#[$struct_meta])*
         pub struct History {
+            elements_filter: $crate::filters::SingleFilter<String>,
+            attributes_filter: $crate::filters::SingleFilter<$crate::filters::AttributeIdMatcher>,
             $(
             #[cfg(feature = $feature)]
             $(#[$field_meta])*
@@ -43,13 +53,19 @@ macro_rules! history_def {
             type Config = Config;
             type ConfigError = ConfigError;
             fn init(server: ::server::ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+                trace!("initializing history with config: {config:?}");
                 Ok(Self {
+                    elements_filter: config.elements_filter,
+                    attributes_filter: config.attributes_filter,
                 $(
                    #[cfg(feature=$feature)]
-                    $backend_name: <backends::$backend_ty as Backend>::init(server, config.$conf_ident)?,
+                    $backend_name: <backends::$backend_ty as Backend>::init(server.clone(), config.$conf_ident)?,
                 )*})
             }
             fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError> {
+                trace!("reconfiguring history with config: {config:?}");
+                self.elements_filter = config.elements_filter;
+                self.attributes_filter = config.attributes_filter;
                 $(
                 #[cfg(feature=$feature)]
                 <backends::$backend_ty as Backend>::reconfigure(&mut self.$backend_name, config.$conf_ident)?;
@@ -60,10 +76,12 @@ macro_rules! history_def {
         impl ::server::NotificationProvider for History {
             fn notify(&self, notification: ::server::Notification) {
                 let now = chrono::Utc::now();
+                if !self.elements_filter.allows(&notification.element_id) { return; }
                 match notification.reason {
                     ::server::NotificationReason::AttributeEdit(edit) => match edit.change {
                         ::server::AttributeValueChange::Create(new) |
                         ::server::AttributeValueChange::Edit(_, new) => {
+                            if !self.attributes_filter.allows(&edit.id) { return; }
                             ::tracing::trace!("received attribute value change");
                         $(
                            #[cfg(feature=$feature)]
@@ -72,6 +90,7 @@ macro_rules! history_def {
                            }
                         )*},
                         ::server::AttributeValueChange::Delete(_) => {
+                            if !self.attributes_filter.allows(&edit.id) { return; }
                             ::tracing::trace!("received attribute value deletion");
                         $(
                             #[cfg(feature=$feature)]
