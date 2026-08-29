@@ -45,7 +45,7 @@ impl FsJsonBackend {
         }
         let file = File::options()
             .read(true)
-            .write(write)
+            .write(true)
             .create(true)
             .open(path)?;
         if write {

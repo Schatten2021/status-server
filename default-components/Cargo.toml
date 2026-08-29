@@ -28,14 +28,15 @@ history-sqlite-backend = ["history", "dep:rusqlite", "rusqlite/bundled", "rusqli
 # definitions for better mass importing
 all-utils = ["filters"]
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
-all-other = ["names", "all-history-backends"]
+all-other = ["names", "history"]
 all-history-backends = ["history-fs-json-backend", "history-sqlite-backend"]
 all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
 all = ["all-utils", "all-status", "all-notifications", "all-other"]
-default = ["all-status", "all-notifications", "all-other"]
+
+default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend"]
 
 [dependencies]
 # used in basically every scenario

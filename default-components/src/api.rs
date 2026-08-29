@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use axum::body::Body;
+use axum::response::IntoResponse;
 use utils::Never;
 use api_types::{ApiResponse, ServerError};
 use server::ComponentHandle;
@@ -60,6 +61,7 @@ fn should_handle_path(mut path: &str, mut prefix: &str) -> bool {
         "" | "/" |
         "/current"
     )
+        || (cfg!(feature = "history") && matches!(path, "/history/attribute" | "/history/online"))
 }
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConfigWrapper {
@@ -107,17 +109,19 @@ impl server::Component for Api {
                 }
             };
         }
+        /// When the request was ok
         macro_rules! ok {
             ($val:expr) => {
                 json!(200, ::api_types::ApiResponse::<_, ()>::Ok($val))
             };
         }
-        #[expect(unused, reason="unused for now, might use it in the future for authenticated routes/etc.")]
+        /// User error
         macro_rules! err {
             ($code:literal, $val:expr) => {
                 json!($code, ::api_types::ApiResponse::<(), _>::ClientError($val))
             };
         }
+        /// Server-side exception
         macro_rules! exception {
             ($id:literal, $msg:expr) => {
                 json!(500, ::api_types::ApiResponse::<(), ()>::ServerError(::api_types::ServerError {
@@ -153,6 +157,50 @@ impl server::Component for Api {
                     ))
                 },
                 // TODO: add routes for requesting selected elements/stati/etc.
+                #[cfg(feature = "history")]
+                "/history/attribute" => {
+                    use axum::extract::{FromRequest, Json};
+                    let Json(args): Json<api_types::history::AttributeHistoryRequest> = match Json::from_request(request, &()).await {
+                        Ok(v) => v,
+                        Err(e) => return e.into_response(),
+                    };
+                    let history = state.component_map::<crate::History, _, _>(|hist| {
+                        hist.map(|hist| hist.get_attribute_history(&args.element_id, &args.attribute_id))
+                    });
+                    match history {
+                        None => err!(404, "invalid element/attribute id"),
+                        Some(Err(e)) => exception!("history.internal", e.to_string()),
+                        Some(Ok(v)) => ok!(api_types::history::AttributeHistory(v.into_iter()
+                            .map(|(timestamp, new_val)| api_types::history::AttributeHistoryElement {
+                                timestamp,
+                                new_value: new_val.map(Into::into),
+                            })
+                            .collect()
+                        )),
+                    }
+                },
+                #[cfg(feature = "history")]
+                "/history/online" => {
+                    use axum::extract::{FromRequest, Json};
+                    let Json(args): Json<api_types::history::OnlineStateHistoryRequest> = match Json::from_request(request, &()).await {
+                        Ok(v) => v,
+                        Err(e) => return e.into_response(),
+                    };
+                    let history = state.component_map::<crate::History, _, _>(|hist| {
+                        hist.map(|hist| hist.get_online_state_history(&args.element_id))
+                    });
+                    match history {
+                        None => err!(404, "invalid element/attribute id"),
+                        Some(Err(e)) => exception!("history.internal", e.to_string()),
+                        Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
+                            .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
+                                timestamp,
+                                new_state: new_val,
+                            })
+                            .collect()
+                        )),
+                    }
+                },
                 _ => {
                     error!("route `{path}` set to handle but no handle registered!");
                     exception!("unhandled.route", "Route marked as handled without a handle registered!")

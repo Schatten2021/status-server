@@ -36,7 +36,7 @@ all-other = ["names", "history"]
 all-history-backends = ["history-fs-json-backend", "history-sqlite-backend"]
 all = ["all-status", "all-notifications", "all-other", "all-history-backends"]
 
-default = ["all"]
+default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend"]
 
 
 [dependencies]

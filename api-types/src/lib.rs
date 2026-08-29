@@ -238,3 +238,53 @@ pub mod websocket {
         }
     }
 }
+pub mod history {
+    //! Types for requesting the History of an element's online-state or attribute.
+    use server::AttributeValue;
+
+    api_type!(
+        /// Requests the history of an attribute
+        struct AttributeHistoryRequest {
+            /// The element of which the attribute history is requested.
+            element_id: String,
+            /// The attribute whose history is being requested.
+            attribute_id: String,
+        }
+    );
+    api_type!(
+        /// A single element in an attribute's history.
+        struct AttributeHistoryElement {
+            /// The timestamp that the change was recorded
+            timestamp: chrono::DateTime<chrono::Utc>,
+            /// The new value (if any new value existed).
+            ///
+            /// A change to [`None`] indicates that the attribute was deleted.
+            new_value: Option<AttributeValue>,
+        }
+    );
+    api_type!(
+        /// The entire history of a single attribute
+        struct AttributeHistory(Vec<AttributeHistoryElement>)
+    );
+
+    api_type!(
+        /// Requests the online-state history of an element
+        struct OnlineStateHistoryRequest {
+            /// The id of the element whose online-state history is being requested.
+            element_id: String,
+        }
+    );
+    api_type!(
+        /// A single element in an element's online-state history
+        struct OnlineStateHistoryElement {
+            /// The timestamp that the change was recorded
+            timestamp: chrono::DateTime<chrono::Utc>,
+            /// The new online-state of hte element.
+            new_state: bool,
+        }
+    );
+    api_type!(
+        /// The entire history of a single element's online-state
+        struct OnlineStateHistory(Vec<OnlineStateHistoryElement>)
+    );
+}

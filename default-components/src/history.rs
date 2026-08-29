@@ -145,7 +145,7 @@ history_def!(
     /// history, **NOT** which one is used to *store* the history! History is stored in all enabled
     /// backends.
     struct History {
-        if "history-fs-json-backend"(fs_json): fs_json_backend: FsJsonBackend,
         if "history-sqlite-backend"(sqlite): sqlite: SqliteBackend,
+        if "history-fs-json-backend"(fs_json): fs_json_backend: FsJsonBackend,
     }
 );

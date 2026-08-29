@@ -197,9 +197,9 @@ impl super::Backend for SqliteBackend {
     fn get_attribute_history(&self, element: &str, attribute: &str) -> Result<PropertyHistory, Box<dyn std::error::Error>> {
         match &self.mode {
             Mode::Standard { attribute_changes_table, .. } => {
-                let conn = self.conn();
                 let Some(element_id) = self.try_get_element_id(element)? else { return Ok(vec![]) };
                 let Some(attribute_id) = self.try_get_attribute_id(attribute)? else { return Ok(vec![]) };
+                let conn = self.conn();
                 let mut statement = conn.prepare(&format!("SELECT * FROM {attribute_changes_table} WHERE element_id=$2 AND attribute_id=$3;"))?;
                 Ok(statement.query_map((element_id, attribute_id),
                                     |row| {
@@ -207,9 +207,9 @@ impl super::Backend for SqliteBackend {
                                         let value: Option<AttributeValue> = value.map(|serialized| serde_json::from_str(&serialized)
                                             .expect("invalid value in database"));
                                         let timestamp_secs: i64 = row.get("timestamp_secs")?;
-                                        let timestamp_subsec_millis: i64 = row.get("timestamp_subsec_millis")?;
-                                        let timestamp_subsec_millis = timestamp_subsec_millis as u32;
-                                        Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_millis).expect("invalid timestamp"), value))
+                                        let timestamp_subsec_nanos: i64 = row.get("timestamp_subsec_nanos")?;
+                                        let timestamp_subsec_nanos = timestamp_subsec_nanos as u32;
+                                        Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_nanos).expect("invalid timestamp"), value))
                                     }
                 )?.collect::<Result<Vec<_>, Error>>()?)
             }
@@ -235,16 +235,16 @@ impl super::Backend for SqliteBackend {
     fn get_online_state_history(&self, element: &str) -> Result<OnlineStateHistory, Box<dyn std::error::Error>> {
         match &self.mode {
             Mode::Standard { online_state_changes_table, .. } => {
-                let conn = self.conn();
                 let Some(element_id) = self.try_get_element_id(element)? else { return Ok(vec![]) };
+                let conn = self.conn();
                 let mut statement = conn.prepare(&format!("SELECT * FROM {online_state_changes_table} WHERE element_id=$2;"))?;
                 Ok(statement.query_map([element_id],
                                        |row| {
                                            let value: bool = row.get("state")?;
                                            let timestamp_secs: i64 = row.get("timestamp_secs")?;
-                                           let timestamp_subsec_millis: i64 = row.get("timestamp_subsec_millis")?;
-                                           let timestamp_subsec_millis = timestamp_subsec_millis as u32;
-                                           Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_millis).expect("invalid timestamp"), value))
+                                           let timestamp_subsec_nanos: i64 = row.get("timestamp_subsec_nanos")?;
+                                           let timestamp_subsec_nanos = timestamp_subsec_nanos as u32;
+                                           Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_nanos).expect("invalid timestamp"), value))
                                        }
                 )?.collect::<Result<Vec<_>, Error>>()?)
             }
