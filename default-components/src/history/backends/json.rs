@@ -56,17 +56,21 @@ impl FsJsonBackend {
         }
         Ok(file)
     }
-    // TODO: add a try_open to check if the attribute even exists.
+    fn attribute_path(&self, element: &str, attribute: &str) -> PathBuf {
+        self.element_path(element)
+            .join(attr_id_to_path(attribute))
+            .join("attribute.json")
+    }
     fn open_attribute(&self, element: &str, attribute: &str, write: bool) -> std::io::Result<File> {
-        let attr_path = attr_id_to_path(attribute);
-        let path = self.element_path(element)
-            .join(attr_path)
-            .join("attribute.json");
+        let path = self.attribute_path(element, attribute);
         Self::open_file(path, write)
     }
+    fn online_path(&self, element: &str) -> PathBuf {
+        self.element_path(element)
+            .join("online.json")
+    }
     fn open_online_state(&self, element: &str, write: bool) -> std::io::Result<File> {
-        let path = self.element_path(element)
-            .join("online.json");
+        let path = self.online_path(element);
         Self::open_file(path, write)
     }
 }
@@ -97,6 +101,7 @@ impl super::Backend for FsJsonBackend {
     }
 
     fn get_attribute_history(&self, element: &str, attribute: &str) -> Result<PropertyHistory, Box<dyn Error>> {
+        if !self.attribute_path(element, attribute).exists() { return Ok(vec![]); }
         let mut file = self.open_attribute(element, attribute, false)?;
         Ok(serde_json::from_reader(&mut file)?)
     }
@@ -115,6 +120,7 @@ impl super::Backend for FsJsonBackend {
     }
 
     fn get_online_state_history(&self, element: &str) -> Result<OnlineStateHistory, Box<dyn Error>> {
+        if !self.online_path(element).exists() { return Ok(vec![]); }
         Ok(serde_json::from_reader(self.open_online_state(element, false)?)?)
     }
 }
