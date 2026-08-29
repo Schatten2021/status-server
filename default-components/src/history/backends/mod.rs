@@ -3,7 +3,10 @@ use utils::featured_use;
 use server::{ComponentHandle, AttributeValue};
 use super::{PropertyHistory, OnlineStateHistory};
 
-pub trait Backend: Sized {
+featured_use!(if "history-fs-json-backend": json::FsJsonBackend);
+featured_use!(if "history-sqlite-backend": sqlite::SqliteBackend);
+
+pub trait Backend: Sized + Send + Sync + 'static {
     type Config: serde::Serialize + for<'de> serde::Deserialize<'de> + Default;
     /// Errors that can occur while configuring the backend.
     type ConfigError: core::error::Error;
@@ -71,6 +74,3 @@ pub trait Backend: Sized {
     //         .collect()
     // }
 }
-
-
-featured_use!(if "history-fs-json-backend": json::FsJsonBackend);

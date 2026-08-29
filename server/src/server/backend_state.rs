@@ -86,10 +86,7 @@ pub(crate) enum AttributeChange {
 impl GlobalState {
     pub(crate) fn read_config(path: &Path) -> Config {
         let config_str = match std::fs::read_to_string(path) {
-            Ok(v) => {
-                trace!("read config file `{}`: {v:?}", path.to_string_lossy());
-                v
-            },
+            Ok(v) => v,
             Err(e) => {
                 error!("couldn't read config file `{}`: {e}", path.to_string_lossy());
                 return Config::default();

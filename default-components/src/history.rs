@@ -127,5 +127,6 @@ history_def!(
     /// backends.
     struct History {
         if "history-fs-json-backend"(fs_json): fs_json_backend: FsJsonBackend,
+        if "history-sqlite-backend"(sqlite): sqlite: SqliteBackend,
     }
 );

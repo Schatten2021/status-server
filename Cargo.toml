@@ -24,6 +24,7 @@ names = ["default-components/names"]
 # historization
 history = ["default-components/history"]
 history-fs-json-backend = ["history", "default-components/history-fs-json-backend"]
+history-sqlite-backend = ["history", "default-components/history-sqlite-backend"]
 
 # helper features
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
@@ -31,8 +32,9 @@ all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
-all-other = ["names", "history", "history-fs-json-backend"]
-all = ["all-status", "all-notifications", "all-other"]
+all-other = ["names", "history"]
+all-history-backends = ["history-fs-json-backend", "history-sqlite-backend"]
+all = ["all-status", "all-notifications", "all-other", "all-history-backends"]
 
 default = ["all"]
 

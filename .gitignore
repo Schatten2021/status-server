@@ -4,3 +4,4 @@
 /static/wasm
 /releases
 /history
+/history.sqlite3
