@@ -30,6 +30,8 @@ jobs:
                 mkdir -p static/wasm
                 touch static/wasm/frontend.js static/wasm/frontend_bg.wasm
                 cargo clippy --workspace --all-targets -- -D warnings
+                cargo clippy --workspace --all-targets --all-features -- -D warnings
+                cargo test --workspace --all-features
             - name: Tests
               run: cargo test --workspace
 

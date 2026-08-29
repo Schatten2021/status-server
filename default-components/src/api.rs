@@ -88,6 +88,7 @@ impl server::Component for Api {
         Ok(())
     }
 
+    #[allow(clippy::too_many_lines, reason="don't know how to simplify this decently. Also, a decent chunk is just macro definitions that are being reused multiple times.")]
     fn try_handle(&self, request: axum::extract::Request) -> Result<server::RequestHandle, axum::extract::Request> {
         macro_rules! json {
             ($code:expr, $val:expr) => {

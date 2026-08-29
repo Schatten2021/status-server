@@ -152,6 +152,7 @@ history_def!(
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::needless_update, reason="the `..Default::default()` is used for when a backend is selected")]
     use crate::filters::{AttributeIdMatcher, FilterPriority, SingleFilter};
     use super::Config;
     use super::*;

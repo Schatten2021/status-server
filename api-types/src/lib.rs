@@ -240,7 +240,7 @@ pub mod websocket {
 }
 pub mod history {
     //! Types for requesting the History of an element's online-state or attribute.
-    use server::AttributeValue;
+    use crate::AttributeValue;
 
     api_type!(
         /// Requests the history of an attribute

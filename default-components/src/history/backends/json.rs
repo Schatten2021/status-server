@@ -7,8 +7,8 @@ use std::path::PathBuf;
 use utils::Never;
 const SLASH_REPLACEMENT_TOKEN: &str = "ThisTokenWillNeverExistInTheWild";
 fn attr_id_to_path(id: &str) -> String {
-    id.replace("/", SLASH_REPLACEMENT_TOKEN)
-        .replace(".","/")
+    id.replace('/', SLASH_REPLACEMENT_TOKEN)
+        .replace('.',"/")
         .replace(SLASH_REPLACEMENT_TOKEN, ".")
 }
 // fn path_to_attr_id(path: &str) -> String {
@@ -40,23 +40,23 @@ impl FsJsonBackend {
         self.config.base_path.join(element)
     }
     fn open_file(path: PathBuf, write: bool) -> std::io::Result<File> {
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                std::fs::create_dir_all(parent)?
-            }
+        if let Some(parent) = path.parent() && !parent.exists() {
+            std::fs::create_dir_all(parent)?;
         }
         let file = File::options()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(path)?;
         if write {
-            file.lock()?
+            file.lock()?;
         } else {
-            file.lock_shared()?
+            file.lock_shared()?;
         }
         Ok(file)
     }
+    // TODO: add a try_open to check if the attribute even exists.
     fn open_attribute(&self, element: &str, attribute: &str, write: bool) -> std::io::Result<File> {
         let attr_path = attr_id_to_path(attribute);
         let path = self.element_path(element)

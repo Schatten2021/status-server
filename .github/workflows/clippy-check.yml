@@ -22,4 +22,6 @@ jobs:
           touch static/wasm/frontend.js static/wasm/frontend_bg.wasm
 
       - name: Run clippy on workspace
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: |
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo clippy --workspace --all-targets --all-features -- -D warnings

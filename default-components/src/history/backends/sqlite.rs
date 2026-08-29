@@ -85,29 +85,29 @@ impl SqliteBackend {
                 attribute_changes_table
             } => {
                 // TODO: change it so that the columns are created if they don't exist.
-                self.conn().execute(&format!(r#"CREATE TABLE IF NOT EXISTS {element_lookup_table} (
+                self.conn().execute(&format!("CREATE TABLE IF NOT EXISTS {element_lookup_table} (
     id INTEGER NOT NULL CONSTRAINT element_pk PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
-)"#, ), [])?;
-                self.conn().execute(&format!(r#"CREATE TABLE IF NOT EXISTS {attribute_lookup_table} (
+)"), [])?;
+                self.conn().execute(&format!("CREATE TABLE IF NOT EXISTS {attribute_lookup_table} (
     id INTEGER NOT NULL CONSTRAINT attribute_pk PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
-)"#, ), [])?;
-                self.conn().execute(&format!(r#"CREATE TABLE IF NOT EXISTS {online_state_changes_table} (
+)"), [])?;
+                self.conn().execute(&format!("CREATE TABLE IF NOT EXISTS {online_state_changes_table} (
     id INTEGER NOT NULL CONSTRAINT online_state_change_pk PRIMARY KEY AUTOINCREMENT,
     element_id INTEGER NOT NULL CONSTRAINT online_state_change_element_fk REFERENCES {element_lookup_table},
     state INTEGER NOT NULL,
     timestamp_secs INTEGER,
     timestamp_subsec_nanos INTEGER
-)"#), [])?;
-                self.conn().execute(&format!(r#"CREATE TABLE IF NOT EXISTS {attribute_changes_table} (
+)"), [])?;
+                self.conn().execute(&format!("CREATE TABLE IF NOT EXISTS {attribute_changes_table} (
     id INTEGER NOT NULL CONSTRAINT attribute_change_pk PRIMARY KEY AUTOINCREMENT,
     element_id INTEGER NOT NULL CONSTRAINT attribute_change_element_fk REFERENCES {element_lookup_table},
     attribute_id INTEGER NOT NULL CONSTRAINT attribute_change_attribute_fk REFERENCES {attribute_lookup_table},
     val TEXT,
     timestamp_secs INTEGER,
     timestamp_subsec_nanos INTEGER
-)"#), [])?;
+)"), [])?;
             }
         }
         debug!("initialized database");
@@ -116,7 +116,7 @@ impl SqliteBackend {
     fn try_get_element_id(&self, element: &str) -> Result<Option<i64>, Error> {
         match &self.mode {
             Mode::Standard { element_lookup_table, .. } => {
-                self.conn().query_row(&format!(r#"SELECT * FROM {element_lookup_table} WHERE name=$1"#),
+                self.conn().query_row(&format!("SELECT * FROM {element_lookup_table} WHERE name=$1"),
                                           [element],
                                           |row| row.get("id")
                 ).optional()
@@ -127,7 +127,7 @@ impl SqliteBackend {
         if let Some(id) = self.try_get_element_id(element)? { return Ok(id); }
         match &self.mode {
             Mode::Standard { element_lookup_table, .. } => {
-                self.conn().query_row(&format!(r#"INSERT INTO {element_lookup_table}(name) VALUES ($1) RETURNING *;"#),
+                self.conn().query_row(&format!("INSERT INTO {element_lookup_table}(name) VALUES ($1) RETURNING *;"),
                                           [element],
                                           |row| row.get("id")
                 )
@@ -137,7 +137,7 @@ impl SqliteBackend {
     fn try_get_attribute_id(&self, attribute: &str) -> Result<Option<i64>, Error> {
         match &self.mode {
             Mode::Standard { attribute_lookup_table, .. } => self.conn().query_row(
-                &format!(r#"SELECT * FROM {attribute_lookup_table} WHERE name=$1"#),
+                &format!("SELECT * FROM {attribute_lookup_table} WHERE name=$1"),
                 [attribute],
                 |row| row.get("id")
             ).optional()
@@ -147,7 +147,7 @@ impl SqliteBackend {
         if let Some(id) = self.try_get_attribute_id(attribute)? { return Ok(id) }
         match &self.mode {
             Mode::Standard { attribute_lookup_table, .. } => self.conn().query_row(
-                &format!(r#"INSERT INTO {attribute_lookup_table}(name) VALUES ($1) RETURNING *;"#),
+                &format!("INSERT INTO {attribute_lookup_table}(name) VALUES ($1) RETURNING *;"),
                 [attribute],
                 |row| row.get("id")
             )
@@ -176,9 +176,6 @@ impl super::Backend for SqliteBackend {
     }
 
     fn add_attribute_change(&self, element: &str, attribute: &str, timestamp: DateTime<Utc>, new_val: Option<&AttributeValue>) -> Result<(), Box<dyn std::error::Error>> {
-        if attribute == "minecraft.last_seen" || attribute == "website.last_seen" {
-            error!("saw a last_seen!")
-        }
         let attribute_id = self.get_attribute_id(attribute)?;
         let element_id = self.get_element_id(element)?;
         let timestamp_secs = timestamp.timestamp();
@@ -187,7 +184,7 @@ impl super::Backend for SqliteBackend {
         match &self.mode {
             Mode::Standard { attribute_changes_table, .. } => {
                 self.conn().execute(
-                    &format!(r#"INSERT INTO {attribute_changes_table}(element_id, attribute_id, val, timestamp_secs, timestamp_subsec_nanos) VALUES ($1, $2, $3, $4, $5)"#),
+                    &format!("INSERT INTO {attribute_changes_table}(element_id, attribute_id, val, timestamp_secs, timestamp_subsec_nanos) VALUES ($1, $2, $3, $4, $5)"),
                     (element_id, attribute_id, serialized, timestamp_secs, timestamp_subsec_nanos),
                 )?;
             }
@@ -209,8 +206,7 @@ impl super::Backend for SqliteBackend {
                                         let value: Option<AttributeValue> = value.map(|serialized| serde_json::from_str(&serialized)
                                             .expect("invalid value in database"));
                                         let timestamp_secs: i64 = row.get("timestamp_secs")?;
-                                        let timestamp_subsec_nanos: i64 = row.get("timestamp_subsec_nanos")?;
-                                        let timestamp_subsec_nanos = timestamp_subsec_nanos as u32;
+                                        let timestamp_subsec_nanos: u32 = row.get("timestamp_subsec_nanos")?;
                                         Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_nanos).expect("invalid timestamp"), value))
                                     }
                 )?.collect::<Result<Vec<_>, Error>>()?)
@@ -225,7 +221,7 @@ impl super::Backend for SqliteBackend {
         match &self.mode {
             Mode::Standard { online_state_changes_table, .. } => {
                 self.conn().execute(
-                    &format!(r#"INSERT INTO {online_state_changes_table}(element_id, state, timestamp_secs, timestamp_subsec_nanos) VALUES ($2, $3, $4, $5)"#),
+                    &format!("INSERT INTO {online_state_changes_table}(element_id, state, timestamp_secs, timestamp_subsec_nanos) VALUES ($2, $3, $4, $5)"),
                     (element_id, new_state, timestamp_secs, timestamp_subsec_nanos),
                 )?;
             }
@@ -244,8 +240,7 @@ impl super::Backend for SqliteBackend {
                                        |row| {
                                            let value: bool = row.get("state")?;
                                            let timestamp_secs: i64 = row.get("timestamp_secs")?;
-                                           let timestamp_subsec_nanos: i64 = row.get("timestamp_subsec_nanos")?;
-                                           let timestamp_subsec_nanos = timestamp_subsec_nanos as u32;
+                                           let timestamp_subsec_nanos: u32 = row.get("timestamp_subsec_nanos")?;
                                            Ok((DateTime::from_timestamp(timestamp_secs, timestamp_subsec_nanos).expect("invalid timestamp"), value))
                                        }
                 )?.collect::<Result<Vec<_>, Error>>()?)
