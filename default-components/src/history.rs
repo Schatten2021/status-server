@@ -149,3 +149,62 @@ history_def!(
         if "history-fs-json-backend"(fs_json): fs_json_backend: FsJsonBackend,
     }
 );
+
+#[cfg(test)]
+mod test {
+    use crate::filters::{AttributeIdMatcher, FilterPriority, SingleFilter};
+    use super::Config;
+    use super::*;
+    use crate::parse_test;
+    parse_test!(empty(Config): toml::Table::new() => Config {
+        elements_filter: SingleFilter::default(),
+        attributes_filter: SingleFilter::default(),
+        #[cfg(feature="history-sqlite-backend")]
+        sqlite: backends::sqlite::Config::default(),
+        ..Default::default()
+    });
+    parse_test!(elements(Config): toml!{
+        elements.allow = ["foo"]
+    } => Config {
+        elements_filter: SingleFilter {
+            whitelist: vec!["foo".to_string()],
+            blacklist: vec![],
+            priority: FilterPriority::Whitelist,
+        },
+        attributes_filter: SingleFilter::default(),
+        ..Default::default()
+    });
+    parse_test!(attributes(Config): toml!{
+        attributes.deny = [{ id = "foo" }]
+    } => Config {
+        elements_filter: SingleFilter::default(),
+        attributes_filter: SingleFilter {
+            whitelist: vec![],
+            blacklist: vec![AttributeIdMatcher {
+                id: "foo".to_string(),
+                exact: true,
+            }],
+            priority: FilterPriority::Whitelist,
+        },
+        ..Default::default()
+    });
+    parse_test!(all(Config): toml!{
+        elements.allow = ["foo"]
+        attributes.deny = [{ id = "foo" }]
+    } => Config {
+        elements_filter: SingleFilter {
+            whitelist: vec!["foo".to_string()],
+            blacklist: vec![],
+            priority: FilterPriority::Whitelist,
+        },
+        attributes_filter: SingleFilter {
+            whitelist: vec![],
+            blacklist: vec![AttributeIdMatcher {
+                id: "foo".to_string(),
+                exact: true,
+            }],
+            priority: FilterPriority::Whitelist,
+        },
+        ..Default::default()
+    });
+}

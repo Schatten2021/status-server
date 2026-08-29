@@ -20,6 +20,7 @@ fn default_path() -> PathBuf { "history/json".into() }
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct Config {
     #[serde(default="default_path")]
+    #[serde(alias="path")]
     base_path: PathBuf,
 }
 impl Default for Config {
@@ -30,6 +31,7 @@ impl Default for Config {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct FsJsonBackend {
     config: Config,
 }
@@ -115,4 +117,17 @@ impl super::Backend for FsJsonBackend {
     fn get_online_state_history(&self, element: &str) -> Result<OnlineStateHistory, Box<dyn Error>> {
         Ok(serde_json::from_reader(self.open_online_state(element, false)?)?)
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::parse_test;
+
+    parse_test!(empty(Config): toml::Table::new() => Config {
+        base_path: "history/json".into(),
+    });
+    parse_test!(non_empty(Config): toml!(path = "/var/backup/status-server/history") => Config {
+        base_path: "/var/backup/status-server/history".into()
+    });
 }

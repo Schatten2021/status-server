@@ -28,7 +28,9 @@ mod mode_defaults {
 }
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all="snake_case")]
 pub enum Mode {
+    #[serde(alias="default")]
     Standard {
         #[serde(default="mode_defaults::standard::element_lookup_table")]
         element_lookup_table: String,
@@ -250,4 +252,47 @@ impl super::Backend for SqliteBackend {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{default_path, Config, Mode, mode_defaults as defaults};
+    use crate::parse_test;
+    parse_test!(empty(Config): toml::Table::new() => Config {
+        path: default_path(),
+        mode: Mode::default(),
+    });
+    parse_test!(with_path(Config): toml!{
+        path = "db.sqlite3"
+    } => Config {
+        path: "db.sqlite3".into(),
+        mode: Mode::default(),
+    });
+    parse_test!(with_empty_default_mode(Config): toml!{
+        mode.default = {}
+    } => Config {
+        path: default_path(),
+        mode: Mode::Standard {
+            element_lookup_table: defaults::standard::element_lookup_table(),
+            attribute_lookup_table: defaults::standard::attribute_lookup_table(),
+            online_state_changes_table: defaults::standard::online_state_changes_table(),
+            attribute_changes_table: defaults::standard::attribute_changes_table(),
+        }
+    });
+    parse_test!(with_full_default_mode(Config): toml!{
+        mode.standard = {
+            element_lookup_table = "element",
+            attribute_lookup_table = "attribute",
+            online_state_changes_table = "online",
+            attribute_changes_table = "attribute-change"
+        }
+    } => Config {
+        path: default_path(),
+        mode: Mode::Standard {
+            element_lookup_table: "element".to_string(),
+            attribute_lookup_table: "attribute".to_string(),
+            online_state_changes_table: "online".to_string(),
+            attribute_changes_table: "attribute-change".to_string(),
+        }
+    });
 }

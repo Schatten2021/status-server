@@ -3,8 +3,8 @@ use utils::featured_use;
 use server::{ComponentHandle, AttributeValue};
 use super::{PropertyHistory, OnlineStateHistory};
 
-featured_use!(if "history-fs-json-backend": json::FsJsonBackend);
-featured_use!(if "history-sqlite-backend": sqlite::SqliteBackend);
+featured_use!(if "history-fs-json-backend": pub(crate) json::FsJsonBackend);
+featured_use!(if "history-sqlite-backend": pub(crate) sqlite::SqliteBackend);
 
 pub trait Backend: Sized + Send + Sync + 'static {
     type Config: serde::Serialize + for<'de> serde::Deserialize<'de> + Default;

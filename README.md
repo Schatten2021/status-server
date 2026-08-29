@@ -67,6 +67,7 @@ can use `email.status`; NOTE: `notify` are also aliased as `notifications`). The
 | website    | `website`   | `status`   | website-status      | [ref](docs/config/website.md)    |
 | dataminer  | `miner`     | `status`   | dataminer-status    | [ref](docs/config/dataminer.md)  |
 | names      | `names`     | none       | names               | [ref](docs/config/names.md)      |
+| history    | `history`   | none       | history (+ backend) |                                  |
 
 Additionally, many configurations use [filters](docs/config/filter.md) to provide a uniform filtering interface.
 
@@ -75,3 +76,12 @@ This project uses [semantic versioning](https://semver.org/) for its binaries.
 This means that the released compiled binaries (and source-code) are backwards compatible between minor version changes.
 
 This is ensured via config-tests. Any change to any of the config tests is considered a breaking change.
+
+What counts as a non-breaking change:
+- changes to the frontend UI
+- changes to some internal behavior, that does not change exported types
+
+What counts as a breaking/feature change:
+- changes to the API
+- changes to some exported types in a crate
+- changes to the configuration
