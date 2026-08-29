@@ -1,8 +1,5 @@
-use std::collections::HashMap;
 use axum::body::Body;
-use axum::response::IntoResponse;
 use utils::Never;
-use api_types::{ApiResponse, ServerError};
 use server::ComponentHandle;
 use crate::filters::{AttributeIdMatcher, SingleFilter};
 
@@ -90,47 +87,6 @@ impl server::Component for Api {
 
     #[allow(clippy::too_many_lines, reason="don't know how to simplify this decently. Also, a decent chunk is just macro definitions that are being reused multiple times.")]
     fn try_handle(&self, request: axum::extract::Request) -> Result<server::RequestHandle, axum::extract::Request> {
-        macro_rules! json {
-            ($code:expr, $val:expr) => {
-                match ::serde_json::to_string(&$val) {
-                    Ok(v) => ($code, v),
-                    Err(e) => {
-                        error!("couldn't JSON-serialize response: {e}");
-                        match ::serde_json::to_string(&ApiResponse::<(), ()>::ServerError(ServerError {
-                            id: "json.serialize".to_string(),
-                            message: e.to_string(),
-                        })) {
-                            Ok(v) => (500, v),
-                            Err(e) => {
-                                error!("couldn't JSON serialize JSON serialization error?!?!? ({e})");
-                                (200, "{}".to_string())
-                            }
-                        }
-                    }
-                }
-            };
-        }
-        /// When the request was ok
-        macro_rules! ok {
-            ($val:expr) => {
-                json!(200, ::api_types::ApiResponse::<_, ()>::Ok($val))
-            };
-        }
-        /// User error
-        macro_rules! err {
-            ($code:literal, $val:expr) => {
-                json!($code, ::api_types::ApiResponse::<(), _>::ClientError($val))
-            };
-        }
-        /// Server-side exception
-        macro_rules! exception {
-            ($id:literal, $msg:expr) => {
-                json!(500, ::api_types::ApiResponse::<(), ()>::ServerError(::api_types::ServerError {
-                    id: $id.to_string(),
-                    message: $msg.to_string()
-                }))
-            };
-        }
         if !should_handle_path(request.uri().path(), &self.config.path) {
             return Err(request)
         }
@@ -144,78 +100,146 @@ impl server::Component for Api {
         Ok(Box::pin(async move {
             let path = &request.uri().path()[path_prefix_len..];
             let _ = request;
-            let (code, json) = match path {
-                "/" => ok!("Welcome to the API!"),
-                "/current" => {
-                    ok!(api_types::States::from(state.get_states()
-                        .into_iter()
-                        .filter(|(id, _)| element_filter.allows(id))
-                        .map(|(id, mut state)| {
-                            state.attributes.retain(|id, _| attribute_filter.allows(id));
-                            (id, state)
-                        })
-                        .collect::<HashMap<_, _>>()
-                    ))
-                },
+            let res = match path {
+                "/" => Ok(handles::index()),
+                "/current" => Ok(handles::current(&state, &element_filter, &attribute_filter)),
                 // TODO: add routes for requesting selected elements/stati/etc.
                 #[cfg(feature = "history")]
-                "/history/attribute" => {
-                    use axum::extract::{FromRequest, Json};
-                    let Json(args): Json<api_types::history::AttributeHistoryRequest> = match Json::from_request(request, &()).await {
-                        Ok(v) => v,
-                        Err(e) => return e.into_response(),
-                    };
-                    let history = state.component_map::<crate::History, _, _>(|hist| {
-                        hist.map(|hist| hist.get_attribute_history(&args.element_id, &args.attribute_id))
-                    });
-                    match history {
-                        None => err!(404, "invalid element/attribute id"),
-                        Some(Err(e)) => exception!("history.internal", e.to_string()),
-                        Some(Ok(v)) => ok!(api_types::history::AttributeHistory(v.into_iter()
-                            .map(|(timestamp, new_val)| api_types::history::AttributeHistoryElement {
-                                timestamp,
-                                new_value: new_val.map(Into::into),
-                            })
-                            .collect()
-                        )),
-                    }
-                },
+                "/history/attribute" => handles::history_attribute(request, &state, &attribute_filter, &element_filter).await,
                 #[cfg(feature = "history")]
-                "/history/online" => {
-                    use axum::extract::{FromRequest, Json};
-                    let Json(args): Json<api_types::history::OnlineStateHistoryRequest> = match Json::from_request(request, &()).await {
-                        Ok(v) => v,
-                        Err(e) => return e.into_response(),
-                    };
-                    let history = state.component_map::<crate::History, _, _>(|hist| {
-                        hist.map(|hist| hist.get_online_state_history(&args.element_id))
-                    });
-                    match history {
-                        None => err!(404, "invalid element/attribute id"),
-                        Some(Err(e)) => exception!("history.internal", e.to_string()),
-                        Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
+                "/history/online" => handles::history_online(request, &state, &element_filter).await,
+                _ => Ok(handles::default(path))
+            };
+            match res {
+                Ok((code, json)) => axum::response::Response::builder()
+                    .header("Content-Type", "application/json")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Allow-Methods", "GET")
+                    .header("Access-Control-Allow-Headers", "*")
+                    .status(code)
+                    .body(Body::new(json))
+                    .expect("some argument failed to parse?"),
+                Err(e) => e,
+            }
+        }))
+    }
+}
+mod handles {
+    macro_rules! json {
+            ($code:expr, $val:expr) => {
+                match ::serde_json::to_string(&$val) {
+                    Ok(v) => ($code, v),
+                    Err(e) => {
+                        error!("couldn't JSON-serialize response: {e}");
+                        match ::serde_json::to_string(&::api_types::ApiResponse::<(), ()>::ServerError(::api_types::ServerError {
+                            id: "json.serialize".to_string(),
+                            message: e.to_string(),
+                        })) {
+                            Ok(v) => (500, v),
+                            Err(e) => {
+                                error!("couldn't JSON serialize JSON serialization error?!?!? ({e})");
+                                (200, "{}".to_string())
+                            }
+                        }
+                    }
+                }
+            };
+        }
+    /// When the request was ok
+    macro_rules! ok {
+            ($val:expr) => {
+                json!(200, ::api_types::ApiResponse::<_, ()>::Ok($val))
+            };
+        }
+    /// User error
+    macro_rules! err {
+            ($code:literal, $val:expr) => {
+                json!($code, ::api_types::ApiResponse::<(), _>::ClientError($val))
+            };
+        }
+    /// Server-side exception
+    macro_rules! exception {
+            ($id:literal, $msg:expr) => {
+                json!(500, ::api_types::ApiResponse::<(), ()>::ServerError(::api_types::ServerError {
+                    id: $id.to_string(),
+                    message: $msg.to_string()
+                }))
+            };
+        }
+
+    use std::collections::HashMap;
+    use axum::extract::Request;
+    use axum::response::{IntoResponse, Response};
+    use server::ComponentHandle;
+    use crate::filters::{AttributeIdMatcher, SingleFilter};
+
+    pub fn index() -> (u16, String) {
+        ok!("Welcome to the API!")
+    }
+    pub fn current(state: &ComponentHandle, element_filter: &SingleFilter<String>, attribute_filter: &SingleFilter<AttributeIdMatcher>) -> (u16, String) {
+        ok!(api_types::States::from(state.get_states()
+            .into_iter()
+            .filter(|(id, _)| element_filter.allows(id))
+            .map(|(id, mut state)| {
+                state.attributes.retain(|id, _| attribute_filter.allows(id));
+                (id, state)
+            })
+            .collect::<HashMap<_, _>>()
+        ))
+    }
+    #[cfg(feature = "history")]
+    pub async fn history_attribute(request: Request, state: &ComponentHandle, attribute_filter: &SingleFilter<AttributeIdMatcher>, element_filter: &SingleFilter<String>) -> Result<(u16, String), Response>{
+        use axum::extract::{FromRequest, Json};
+        let Json(args): Json<api_types::history::AttributeHistoryRequest> = match Json::from_request(request, &()).await {
+            Ok(v) => v,
+            Err(e) => return Err(e.into_response()),
+        };
+        if !element_filter.allows(&args.element_id) || !attribute_filter.allows(&args.attribute_id) {
+            return Ok(err!(404, "invalid element/attribute id"));
+        }
+        let history = state.component_map::<crate::History, _, _>(|hist| {
+            hist.map(|hist| hist.get_attribute_history(&args.element_id, &args.attribute_id))
+        });
+        Ok(match history {
+            None => err!(404, "invalid element/attribute id"),
+            Some(Err(e)) => exception!("history.internal", e.to_string()),
+            Some(Ok(v)) => ok!(api_types::history::AttributeHistory(v.into_iter()
+                .map(|(timestamp, new_val)| api_types::history::AttributeHistoryElement {
+                    timestamp,
+                    new_value: new_val.map(Into::into),
+                })
+                .collect()
+            )),
+        })
+    }
+    #[cfg(feature = "history")]
+    pub async fn history_online(request: Request, state: &ComponentHandle, element_filter: &SingleFilter<String>) -> Result<(u16, String), Response> {
+        use axum::extract::{FromRequest, Json};
+        let Json(args): Json<api_types::history::OnlineStateHistoryRequest> = match Json::from_request(request, &()).await {
+            Ok(v) => v,
+            Err(e) => return Err(e.into_response()),
+        };
+        if !element_filter.allows(&args.element_id) {
+            return Ok(err!(404, "invalid element/attribute id"));
+        }
+        let history = state.component_map::<crate::History, _, _>(|hist| {
+            hist.map(|hist| hist.get_online_state_history(&args.element_id))
+        });
+        Ok(match history {
+            None => err!(404, "invalid element/attribute id"),
+            Some(Err(e)) => exception!("history.internal", e.to_string()),
+            Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
                             .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
                                 timestamp,
                                 new_state: new_val,
                             })
                             .collect()
                         )),
-                    }
-                },
-                _ => {
-                    error!("route `{path}` set to handle but no handle registered!");
-                    exception!("unhandled.route", "Route marked as handled without a handle registered!")
-                }
-            };
-            axum::response::Response::builder()
-                .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
-                .header("Access-Control-Allow-Methods", "GET")
-                .header("Access-Control-Allow-Headers", "*")
-                .status(code)
-                .body(Body::new(json))
-                .expect("some argument failed to parse?")
-        }))
+        })
+    }
+    pub fn default(path: &str) -> (u16, String) {
+        error!("route `{path}` set to handle but no handle registered!");
+        exception!("unhandled.route", "Route marked as handled without a handle registered!")
     }
 }
 
