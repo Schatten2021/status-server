@@ -153,16 +153,16 @@ fn send_ping(url: &str, port: u16) -> Result<StatusResponse, ()> {
     let mut conn = std::net::TcpStream::connect((url, port))
         .map_err(|e| error!("failed to connect to Minecraft server: {e}"))?;
     minecraft_net::send_packet(
-        minecraft_net::packets::handshake::upstream::Handshake::new(url.to_string(), port, 1),
         &mut conn,
+        &minecraft_net::packets::handshake::upstream::Handshake::new(minecraft_net::VarInt(776), url.to_string(), port, minecraft_net::VarInt(1)),
         None
     ).map_err(|e| error!("failed to send Handshake to Minecraft server: {e:?}"))?;
     minecraft_net::send_packet(
-        minecraft_net::packets::status::upstream::StatusRequest::new(),
         &mut conn,
+        &minecraft_net::packets::status::upstream::StatusRequest::new(),
         None,
     ).map_err(|e| error!("failed to request status to Minecraft server: {e:?}"))?;
-    let response = minecraft_net::receive_packet::<minecraft_net::packets::status::downstream::StatusResponse>(conn, false)
+    let response = minecraft_net::read_packet::<_, minecraft_net::packets::status::downstream::StatusResponse>(conn, false)
         .map_err(|e| error!("failed to read status response from Minecraft server: {e:?}"))?;
     trace!("received Minecraft server status response: \"{}\"", response.status);
     serde_json::from_str::<StatusResponse>(&response.status)
