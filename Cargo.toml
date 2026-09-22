@@ -26,6 +26,10 @@ history = ["default-components/history"]
 history-fs-json-backend = ["history", "default-components/history-fs-json-backend"]
 history-sqlite-backend = ["history", "default-components/history-sqlite-backend"]
 
+# auth
+auth = ["default-components/auth", "dep:argon2"]
+auth-config-backend = ["auth", "default-components/auth-config-backend"]
+
 # helper features
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
 all-notifications = [
@@ -34,9 +38,10 @@ all-notifications = [
 ]
 all-other = ["names", "history"]
 all-history-backends = ["history-fs-json-backend", "history-sqlite-backend"]
-all = ["all-status", "all-notifications", "all-other", "all-history-backends"]
+all-auth-backends = ["auth-config-backend"]
+all = ["all-status", "all-notifications", "all-other", "all-history-backends", "all-auth-backends"]
 
-default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend"]
+default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend", "all-auth-backends"]
 
 
 [dependencies]
@@ -48,6 +53,7 @@ axum.workspace = true
 default-components.workspace = true
 clap = { version = "4.6", features = ["derive"] }
 toml.workspace = true
+argon2 = { workspace = true, optional = true }
 
 
 #
@@ -72,3 +78,4 @@ server = { path = "server" }
 async-trait = "0.1"
 bytecode = { version = "0.2", registry = "kellnr" }
 thiserror = "2"
+argon2 = "0.6"

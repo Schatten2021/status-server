@@ -134,6 +134,6 @@ macro_rules! auth_component {
 auth_component!(
     /// [`server::Component`] for providing authentication services to other components.
     pub struct Auth {
-        if "auth-config-backend"(config): config: config::ConfigAuthBackend;
+        if "auth-config-backend"(#[serde(flatten)] config): config: config::ConfigAuthBackend;
     }
 );

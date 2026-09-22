@@ -19,6 +19,8 @@
 
 mod start_server;
 mod config_check;
+#[cfg(feature = "auth")]
+mod auth_stuff;
 
 #[macro_use]
 extern crate tracing;
@@ -44,8 +46,11 @@ fn main() -> ExitCode {
         Command::Run { host, port } => start_server::start(args.config_file, &host, port),
         Command::CheckConfig => {
             if let Err(()) = config_check::check(&args.config_file) {
-                return ExitCode::FAILURE
+                return ExitCode::FAILURE;
             }
+        }
+        Command::Auth(command) => if let Err(()) = command.command.run() {
+            return ExitCode::FAILURE;
         }
     }
     ExitCode::SUCCESS
@@ -65,6 +70,7 @@ struct Args {
 #[derive(clap::Subcommand, Debug)]
 enum Command {
     #[clap(alias="serve")]
+    /// runs the server.
     Run {
         /// The host (*excluding port*) to bind to.
         #[arg(short='b', long="bind", alias="host", default_value="0.0.0.0")]
@@ -75,5 +81,16 @@ enum Command {
         port: u16,
     },
     #[clap(alias="config-test", alias="config-check", alias="test-config")]
+    /// checks that the current config actually works.
     CheckConfig,
+
+    #[cfg(feature = "auth")]
+    /// various commands relating to authentication, including generating new passwords.
+    Auth(AuthParams),
+}
+#[cfg(feature = "auth")]
+#[derive(clap::Args, Debug)]
+struct AuthParams {
+    #[clap(subcommand)]
+    command: auth_stuff::Commands
 }

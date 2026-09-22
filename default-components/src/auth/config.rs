@@ -37,7 +37,9 @@ impl Password {
 pub struct ConfigUser {
     username: String,
     password: Password,
+    #[serde(default)]
     roles: Vec<String>,
+    #[serde(default)]
     attributes: HashMap<String, ByteCode>,
 }
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
