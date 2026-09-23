@@ -7,6 +7,7 @@ use server::ComponentHandle;
 use crate::auth::User;
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all="lowercase")]
 pub enum Password {
     Plaintext(String),
     Hashed(String),
@@ -42,11 +43,12 @@ pub struct ConfigUser {
     #[serde(default)]
     attributes: HashMap<String, ByteCode>,
 }
+fn day() -> chrono::Duration { chrono::Duration::days(1) }
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Config {
     #[serde(alias="user")]
     users: Vec<ConfigUser>,
-    #[serde(with="utils::duration_parsing")]
+    #[serde(with="utils::duration_parsing", default="day")]
     session_duration: chrono::Duration,
 }
 
@@ -96,7 +98,7 @@ impl super::AuthBackend for ConfigAuthBackend {
 
     type AccessError = argon2::password_hash::Error;
 
-    async fn login(&self, username: &str, password: &str) -> Result<Option<String>, Self::AccessError> {
+    fn login(&self, username: &str, password: &str) -> Result<Option<String>, Self::AccessError> {
         let Some(user) = self.users.get(username) else { return Ok(None) };
         if !user.password.verify(password)? {
             return Ok(None)
@@ -106,7 +108,7 @@ impl super::AuthBackend for ConfigAuthBackend {
         Ok(Some(session_id))
     }
 
-    async fn get_user(&self, session_id: &str) -> Result<Option<User>, Self::AccessError> {
+    fn get_user(&self, session_id: &str) -> Result<Option<User>, Self::AccessError> {
         let lock = self.sessions.read();
         let Some((from, username)) = lock.get(session_id) else {
             return Ok(None);
@@ -127,7 +129,7 @@ impl super::AuthBackend for ConfigAuthBackend {
         }))
     }
 
-    async fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, Self::AccessError> {
+    fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, Self::AccessError> {
         let lock = self.sessions.read();
         let Some((from, username)) = lock.get(session_id) else {
             return Ok(None);
@@ -144,7 +146,7 @@ impl super::AuthBackend for ConfigAuthBackend {
         Ok(Some(user.roles.clone()))
     }
 
-    async fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<ByteCode>, Self::AccessError> {
+    fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<ByteCode>, Self::AccessError> {
         let lock = self.sessions.read();
         let Some((from, username)) = lock.get(session_id) else {
             return Ok(None);

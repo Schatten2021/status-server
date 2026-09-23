@@ -288,3 +288,23 @@ pub mod history {
         struct OnlineStateHistory(Vec<OnlineStateHistoryElement>)
     );
 }
+pub mod auth {
+    //! Types for interacting with the authentication API.
+
+    api_type!(
+        /// attempts to log into the server
+        struct LoginRequest {
+            /// The username of the user
+            username: String,
+            /// The password of the user
+            password: String,
+        }
+    );
+    api_type!(
+        /// Response received upon successful login
+        struct LoginResponse {
+            /// The ID of the session used for further authentication.
+            session_id: String,
+        }
+    );
+}

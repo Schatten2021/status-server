@@ -21,12 +21,13 @@ impl Commands {
                     error!("error reading stdin: {e}");
                     return Err(());
                 }
-                if password_buf.is_empty() {
+                let password = password_buf.trim();
+                if password.is_empty() {
                     error!("must enter a password!");
                     return Err(());
                 }
                 let hasher = argon2::Argon2::default();
-                let hash = match hasher.hash_password(password_buf.as_bytes()) {
+                let hash = match hasher.hash_password(password.as_bytes()) {
                     Ok(v) => v.to_string(),
                     Err(e) => {
                         error!("error hashing password: {e}");

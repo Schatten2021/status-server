@@ -19,13 +19,13 @@ pub trait AuthBackend: Sized {
     fn reconfigure(&mut self, config: Self::Config) -> Result<(), Self::ConfigError>;
 
     type AccessError: std::error::Error;
-    async fn login(&self, username: &str, password: &str) -> Result<Option<String>, Self::AccessError>;
-    async fn get_user(&self, session_id: &str) -> Result<Option<User>, Self::AccessError>;
-    async fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, Self::AccessError> {
-        self.get_user(session_id).await.map(|v| v.map(|u| u.roles))
+    fn login(&self, username: &str, password: &str) -> Result<Option<String>, Self::AccessError>;
+    fn get_user(&self, session_id: &str) -> Result<Option<User>, Self::AccessError>;
+    fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, Self::AccessError> {
+        self.get_user(session_id).map(|v| v.map(|u| u.roles))
     }
-    async fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<bytecode::ByteCode>, Self::AccessError> {
-        match self.get_user(session_id).await? {
+    fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<bytecode::ByteCode>, Self::AccessError> {
+        match self.get_user(session_id)? {
             Some(user) => Ok(user.attributes.get(attribute).cloned()),
             None => Ok(None)
         }
@@ -89,40 +89,41 @@ macro_rules! auth_component {
             ///
             /// Returns `Ok(Some(session_id))` when the user was successfully logged in and
             /// `Ok(None)` if the user does not exist/has a different password.
-            pub async fn login(&self, username: &str, password: &str) -> Result<Option<String>, AccessError> {
+            pub fn login(&self, username: &str, password: &str) -> Result<Option<String>, AccessError> {
+                trace!("attempting to log in user {username}");
                 $(
                 #[cfg(feature=$feature)]
-                if let Some(session_id) = self.$backend_field_name.login(username, password).await? {
+                if let Some(session_id) = self.$backend_field_name.login(username, password)? {
                     return Ok(Some(session_id));
                 }
                 )*
                 Ok(None)
             }
             /// Returns the user belonging to the session.
-            pub async fn get_user(&self, session_id: &str) -> Result<Option<User>, AccessError> {
+            pub fn get_user(&self, session_id: &str) -> Result<Option<User>, AccessError> {
                 $(
                 #[cfg(feature=$feature)]
-                if let Some(session_id) = self.$backend_field_name.get_user(session_id).await? {
+                if let Some(session_id) = self.$backend_field_name.get_user(session_id)? {
                     return Ok(Some(session_id));
                 }
                 )*
                 Ok(None)
             }
             /// returns the roles of the user belonging to the session.
-            pub async fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, AccessError> {
+            pub fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, AccessError> {
                 $(
                 #[cfg(feature=$feature)]
-                if let Some(session_id) = self.$backend_field_name.get_roles(session_id).await? {
+                if let Some(session_id) = self.$backend_field_name.get_roles(session_id)? {
                     return Ok(Some(session_id));
                 }
                 )*
                 Ok(None)
             }
             /// Returns the given attribute of the user to whom the session belongs to.
-            pub async fn get_attribute(&self, session_id: &str, attribute_id: &str) -> Result<Option<bytecode::ByteCode>, AccessError> {
+            pub fn get_attribute(&self, session_id: &str, attribute_id: &str) -> Result<Option<bytecode::ByteCode>, AccessError> {
                 $(
                 #[cfg(feature=$feature)]
-                if let Some(session_id) = self.$backend_field_name.get_attribute(session_id, attribute_id).await? {
+                if let Some(session_id) = self.$backend_field_name.get_attribute(session_id, attribute_id)? {
                     return Ok(Some(session_id));
                 }
                 )*

@@ -7,7 +7,7 @@ edition = "2024"
 # utils
 filters = []
 # api/web "notifications"
-api = ["filters", "dep:api-types", "dep:serde_json", "dep:axum"]
+api = ["filters", "dep:api-types", "dep:serde_json", "dep:axum", "dep:tokio"]
 websockets = ["filters", "dep:api-types", "dep:tokio", "dep:serde_json", "dep:axum", "axum/ws"]
 frontend = ["api", "websockets"]
 # notifications

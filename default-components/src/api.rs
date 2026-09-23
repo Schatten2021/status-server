@@ -59,6 +59,7 @@ fn should_handle_path(mut path: &str, mut prefix: &str) -> bool {
         "/current"
     )
         || (cfg!(feature = "history") && matches!(path, "/history/attribute" | "/history/online"))
+        || (cfg!(feature = "auth") && matches!(path, "/auth/login"))
 }
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConfigWrapper {
@@ -108,6 +109,8 @@ impl server::Component for Api {
                 "/history/attribute" => handles::history_attribute(request, &state, &attribute_filter, &element_filter).await,
                 #[cfg(feature = "history")]
                 "/history/online" => handles::history_online(request, &state, &element_filter).await,
+                #[cfg(feature = "auth")]
+                "/auth/login" => handles::login(request, &state).await,
                 _ => handles::default(path)
             };
             axum::response::Response::builder()
@@ -223,7 +226,7 @@ mod handles {
             hist.map(|hist| hist.get_online_state_history(&args.element_id))
         });
         match history {
-            None => err!(404, "invalid element id"),
+            None => err!(404, "History not enabled"),
             Some(Err(e)) => exception!("history.internal", e.to_string()),
             Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
                             .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
@@ -232,6 +235,28 @@ mod handles {
                             })
                             .collect()
                         )),
+        }
+    }
+    #[cfg(feature = "auth")]
+    pub async fn login(request: Request, state: &ComponentHandle) -> (u16, String) {
+        use axum::extract::{FromRequest, Json};
+        trace!("handling login request");
+        let Json(args): Json<api_types::auth::LoginRequest> = match Json::from_request(request, &()).await {
+            Ok(v) => v,
+            Err(_e) => return err!(400, "missing username/password"),
+        };
+        trace!("login request: {args:?}");
+        trace!("getting session id");
+        let session_id = state.component_map::<crate::Auth, _, _>(move |component| {
+            component.map(move |auth| {
+                auth.login(&args.username, &args.password)
+            })
+        });
+        match session_id {
+            None => err!(404, "Auth not enabled."),
+            Some(Ok(Some(v))) => ok!(api_types::auth::LoginResponse { session_id: v }),
+            Some(Ok(None)) => err!(401, "invalid username/password"),
+            Some(Err(e)) => exception!("auth.internal", e.to_string()),
         }
     }
     pub fn default(path: &str) -> (u16, String) {
