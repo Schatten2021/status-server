@@ -83,5 +83,6 @@ What counts as a non-breaking change:
 
 What counts as a breaking/feature change:
 - changes to the API
+  - Note: If the change is something like adding another optional field, this is not counted as breaking.
 - changes to some exported types in a crate
 - changes to the configuration

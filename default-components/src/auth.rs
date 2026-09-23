@@ -24,6 +24,10 @@ pub trait AuthBackend: Sized {
     fn get_roles(&self, session_id: &str) -> Result<Option<Vec<String>>, Self::AccessError> {
         self.get_user(session_id).map(|v| v.map(|u| u.roles))
     }
+    fn has_role(&self, session_id: &str, role: &str) -> Result<bool, Self::AccessError> {
+        Ok(self.get_roles(session_id)?
+            .is_some_and(|v| v.iter().any(|r| r == role)))
+    }
     fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<bytecode::ByteCode>, Self::AccessError> {
         match self.get_user(session_id)? {
             Some(user) => Ok(user.attributes.get(attribute).cloned()),
@@ -118,6 +122,16 @@ macro_rules! auth_component {
                 }
                 )*
                 Ok(None)
+            }
+            /// checks whether the user has a given role.
+            pub fn has_role(&self, session_id: &str, role: &str) -> Result<bool, AccessError> {
+                $(
+                #[cfg(feature=$feature)]
+                if self.$backend_field_name.has_role(session_id, role)? {
+                    return Ok(true)
+                }
+                )*
+                Ok(false)
             }
             /// Returns the given attribute of the user to whom the session belongs to.
             pub fn get_attribute(&self, session_id: &str, attribute_id: &str) -> Result<Option<bytecode::ByteCode>, AccessError> {

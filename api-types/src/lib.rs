@@ -291,6 +291,8 @@ pub mod history {
 pub mod auth {
     //! Types for interacting with the authentication API.
 
+    use crate::ApiType;
+
     api_type!(
         /// attempts to log into the server
         struct LoginRequest {
@@ -307,4 +309,21 @@ pub mod auth {
             session_id: String,
         }
     );
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+    #[expect(private_bounds, reason="this is supposed to be private to prevent accidentally sending\
+    the wrong type that might not be understood by the server.")]
+    /// Generic wrapper around the `/authenticated/*` api routes.
+    pub struct AuthenticatedRequest<T: ApiType> {
+        /// The session ID as received from a [`LoginResponse`].
+        pub session_id: String,
+
+        /// The actual content of the request.
+        pub content: T,
+    }
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+    /// For requests that merely need to assert that the connected client is authenticated.
+    pub struct Authentication {
+        /// The session ID as received from a [`LoginResponse`].
+        pub session_id: String,
+    }
 }

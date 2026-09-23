@@ -145,6 +145,22 @@ impl super::AuthBackend for ConfigAuthBackend {
         };
         Ok(Some(user.roles.clone()))
     }
+    fn has_role(&self, session_id: &str, role: &str) -> Result<bool, Self::AccessError> {
+        let lock = self.sessions.read();
+        let Some((from, username)) = lock.get(session_id) else {
+            return Ok(false);
+        };
+        if (*from - chrono::Utc::now()) > self.max_session_age {
+            drop(lock);
+            self.sessions.write().remove(session_id);
+            return Ok(false);
+        }
+        let Some(user) = self.users.get(username) else {
+            error!("invalid user for session!");
+            return Ok(false);
+        };
+        Ok(user.roles.iter().any(|r| r == role))
+    }
 
     fn get_attribute(&self, session_id: &str, attribute: &str) -> Result<Option<ByteCode>, Self::AccessError> {
         let lock = self.sessions.read();
