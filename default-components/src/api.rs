@@ -252,17 +252,18 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing username/password"),
         };
-        let session_id = state.component_map::<crate::Auth, _, _>(move |component| {
-            component.map(move |auth| {
-                auth.login(&args.username, &args.password)
-            })
-        });
-        match session_id {
-            None => err!(404, "Auth not enabled."),
-            Some(Ok(Some(v))) => ok!(api_types::auth::LoginResponse { session_id: v }),
-            Some(Ok(None)) => err!(401, "invalid username/password"),
-            Some(Err(e)) => exception!("auth.internal", e.to_string()),
-        }
+        todo!()
+        // let session_id = state.component_map::<crate::Auth, _, _>(move |component| {
+        //     component.map(move |auth| {
+        //         auth.login(&args.username, &args.password)
+        //     })
+        // });
+        // match session_id {
+        //     None => err!(404, "Auth not enabled."),
+        //     Some(Ok(Some(v))) => ok!(api_types::auth::LoginResponse { session_id: v }),
+        //     Some(Ok(None)) => err!(401, "invalid username/password"),
+        //     Some(Err(e)) => exception!("auth.internal", e.to_string()),
+        // }
     }
     #[cfg(feature = "auth")]
     pub async fn authenticated_current(
@@ -277,41 +278,42 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing session_id"),
         };
-        let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
-            component.map(move |auth| {
-                macro_rules! tri {
-                    ($val:expr) => {
-                        match $val {
-                            Ok(Some(v)) => v,
-                            Ok(None) => return Ok(None),
-                            Err(e) => return Err(e),
-                        }
-                    };
-                }
-                Ok(Some((
-                    auth.has_role(&session_id, "admin")?,
-                    tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
-                )))
-            })
-        }) {
-            None => return err!(404, "Auth not enabled"),
-            Some(Ok(Some(user))) => user,
-            Some(Ok(None)) => return err!(401, "not authenticated"),
-            Some(Err(e)) => return exception!("auth.internal", e.to_string()),
-        };
-        if is_admin || ignores_api_rules == bytecode::ByteCode::Bool(true) {
-            ok!(api_types::States::from(state.get_states()))
-        } else {
-            ok!(api_types::States::from(state.get_states()
-                .into_iter()
-                .filter(|(id, _)| element_filter.allows(id))
-                .map(|(id, mut state)| {
-                    state.attributes.retain(|id, _| attribute_filter.allows(id));
-                    (id, state)
-                })
-                .collect::<HashMap<_, _>>()
-            ))
-        }
+        todo!()
+        // let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
+        //     component.map(move |auth| {
+        //         macro_rules! tri {
+        //             ($val:expr) => {
+        //                 match $val {
+        //                     Ok(Some(v)) => v,
+        //                     Ok(None) => return Ok(None),
+        //                     Err(e) => return Err(e),
+        //                 }
+        //             };
+        //         }
+        //         Ok(Some((
+        //             auth.has_role(&session_id, "admin")?,
+        //             tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
+        //         )))
+        //     })
+        // }) {
+        //     None => return err!(404, "Auth not enabled"),
+        //     Some(Ok(Some(user))) => user,
+        //     Some(Ok(None)) => return err!(401, "not authenticated"),
+        //     Some(Err(e)) => return exception!("auth.internal", e.to_string()),
+        // };
+        // if is_admin || ignores_api_rules == bytecode::ByteCode::Bool(true) {
+        //     ok!(api_types::States::from(state.get_states()))
+        // } else {
+        //     ok!(api_types::States::from(state.get_states()
+        //         .into_iter()
+        //         .filter(|(id, _)| element_filter.allows(id))
+        //         .map(|(id, mut state)| {
+        //             state.attributes.retain(|id, _| attribute_filter.allows(id));
+        //             (id, state)
+        //         })
+        //         .collect::<HashMap<_, _>>()
+        //     ))
+        // }
     }
     #[cfg(all(feature = "auth", feature = "history"))]
     pub async fn authenticated_history_attribute(
@@ -326,47 +328,48 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "invalid request (might miss authentication, or request content)"),
         };
-        let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
-            component.map(move |auth| {
-                macro_rules! tri {
-                    ($val:expr) => {
-                        match $val {
-                            Ok(Some(v)) => v,
-                            Ok(None) => return Ok(None),
-                            Err(e) => return Err(e),
-                        }
-                    };
-                }
-                Ok(Some((
-                    auth.has_role(&session_id, "admin")?,
-                    tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
-                )))
-            })
-        }) {
-            None => return err!(404, "Auth not enabled"),
-            Some(Ok(Some(user))) => user,
-            Some(Ok(None)) => return err!(401, "not authenticated"),
-            Some(Err(e)) => return exception!("auth.internal", e.to_string()),
-        };
-        if !is_admin && ignores_api_rules != bytecode::ByteCode::Bool(true) &&
-            (!attribute_filter.allows(&attribute_id) || !element_filter.allows(&element_id)) {
-            return err!(404, "invalid element/attribute id");
-        }
-
-        let history = state.component_map::<crate::History, _, _>(|hist| {
-            hist.map(|hist| hist.get_online_state_history(&element_id))
-        });
-        match history {
-            None => err!(404, "History not enabled"),
-            Some(Err(e)) => exception!("history.internal", e.to_string()),
-            Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
-                            .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
-                                timestamp,
-                                new_state: new_val,
-                            })
-                            .collect()
-                        )),
-        }
+        todo!()
+        // let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
+        //     component.map(move |auth| {
+        //         macro_rules! tri {
+        //             ($val:expr) => {
+        //                 match $val {
+        //                     Ok(Some(v)) => v,
+        //                     Ok(None) => return Ok(None),
+        //                     Err(e) => return Err(e),
+        //                 }
+        //             };
+        //         }
+        //         Ok(Some((
+        //             auth.has_role(&session_id, "admin")?,
+        //             tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
+        //         )))
+        //     })
+        // }) {
+        //     None => return err!(404, "Auth not enabled"),
+        //     Some(Ok(Some(user))) => user,
+        //     Some(Ok(None)) => return err!(401, "not authenticated"),
+        //     Some(Err(e)) => return exception!("auth.internal", e.to_string()),
+        // };
+        // if !is_admin && ignores_api_rules != bytecode::ByteCode::Bool(true) &&
+        //     (!attribute_filter.allows(&attribute_id) || !element_filter.allows(&element_id)) {
+        //     return err!(404, "invalid element/attribute id");
+        // }
+        //
+        // let history = state.component_map::<crate::History, _, _>(|hist| {
+        //     hist.map(|hist| hist.get_online_state_history(&element_id))
+        // });
+        // match history {
+        //     None => err!(404, "History not enabled"),
+        //     Some(Err(e)) => exception!("history.internal", e.to_string()),
+        //     Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
+        //                     .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
+        //                         timestamp,
+        //                         new_state: new_val,
+        //                     })
+        //                     .collect()
+        //                 )),
+        // }
     }
     #[cfg(all(feature = "auth", feature = "history"))]
     pub async fn authenticated_history_online(
@@ -380,45 +383,46 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing element_id"),
         };
-        let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
-            component.map(move |auth| {
-                macro_rules! tri {
-                    ($val:expr) => {
-                        match $val {
-                            Ok(Some(v)) => v,
-                            Ok(None) => return Ok(None),
-                            Err(e) => return Err(e),
-                        }
-                    };
-                }
-                Ok(Some((
-                    auth.has_role(&session_id, "admin")?,
-                    tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
-                )))
-            })
-        }) {
-            None => return err!(404, "Auth not enabled"),
-            Some(Ok(Some(user))) => user,
-            Some(Ok(None)) => return err!(401, "not authenticated"),
-            Some(Err(e)) => return exception!("auth.internal", e.to_string()),
-        };
-        if !is_admin && ignores_api_rules != bytecode::ByteCode::Bool(true) && !element_filter.allows(&element_id) {
-            return err!(404, "invalid element id");
-        }
-        let history = state.component_map::<crate::History, _, _>(|hist| {
-            hist.map(|hist| hist.get_online_state_history(&element_id))
-        });
-        match history {
-            None => err!(404, "History not enabled"),
-            Some(Err(e)) => exception!("history.internal", e.to_string()),
-            Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
-                            .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
-                                timestamp,
-                                new_state: new_val,
-                            })
-                            .collect()
-                        )),
-        }
+        todo!()
+        // let (is_admin, ignores_api_rules) = match state.component_map::<crate::Auth,_,_>(move |component| {
+        //     component.map(move |auth| {
+        //         macro_rules! tri {
+        //             ($val:expr) => {
+        //                 match $val {
+        //                     Ok(Some(v)) => v,
+        //                     Ok(None) => return Ok(None),
+        //                     Err(e) => return Err(e),
+        //                 }
+        //             };
+        //         }
+        //         Ok(Some((
+        //             auth.has_role(&session_id, "admin")?,
+        //             tri!(auth.get_attribute(&session_id, "ignores_api_rules"))
+        //         )))
+        //     })
+        // }) {
+        //     None => return err!(404, "Auth not enabled"),
+        //     Some(Ok(Some(user))) => user,
+        //     Some(Ok(None)) => return err!(401, "not authenticated"),
+        //     Some(Err(e)) => return exception!("auth.internal", e.to_string()),
+        // };
+        // if !is_admin && ignores_api_rules != bytecode::ByteCode::Bool(true) && !element_filter.allows(&element_id) {
+        //     return err!(404, "invalid element id");
+        // }
+        // let history = state.component_map::<crate::History, _, _>(|hist| {
+        //     hist.map(|hist| hist.get_online_state_history(&element_id))
+        // });
+        // match history {
+        //     None => err!(404, "History not enabled"),
+        //     Some(Err(e)) => exception!("history.internal", e.to_string()),
+        //     Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
+        //                     .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
+        //                         timestamp,
+        //                         new_state: new_val,
+        //                     })
+        //                     .collect()
+        //                 )),
+        // }
     }
     pub fn default(path: &str) -> (u16, String) {
         error!("route `{path}` set to handle but no handle registered!");

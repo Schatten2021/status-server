@@ -86,3 +86,4 @@ What counts as a breaking/feature change:
   - Note: If the change is something like adding another optional field, this is not counted as breaking.
 - changes to some exported types in a crate
 - changes to the configuration
+ - Note: If the change is something like adding another optional field, this is not counted as breaking.

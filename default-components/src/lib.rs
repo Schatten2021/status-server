@@ -36,6 +36,7 @@ use utils::featured_use;
 #[cfg(feature = "filters")]
 pub mod filters;
 mod config_wrappers;
+
 pub(crate) use config_wrappers::{ Notification, Status };
 
 featured_use!(if "websockets": websockets::Websockets);
@@ -49,7 +50,9 @@ featured_use!(if "email-notifications": email::EmailNotificationProvider);
 featured_use!(if "ntfy-notifications": ntfy::NtfyNotificationProvider);
 featured_use!(if "names": names::Names);
 featured_use!(if "history": history::History);
-featured_use!(if "auth": auth::Auth);
+// featured_use!(if "auth": auth::Auth);
+#[cfg(feature = "auth")]
+mod auth; // TODO: fix
 
 #[cfg(test)]
 #[macro_export]
