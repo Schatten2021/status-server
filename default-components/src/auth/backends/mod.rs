@@ -40,4 +40,4 @@ pub trait Backend: Sized {
 
 }
 
-featured_use!(if "auth-config-backend": config::ConfigAuthBackend);
+featured_use!(if "auth-config-backend": pub(super) config::ConfigAuthBackend);

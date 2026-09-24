@@ -126,3 +126,21 @@ impl User {
         })
     }
 }
+#[cfg(test)]
+mod test {
+    mod parsing {
+        use crate::parse_test;
+        use super::super::*;
+        use std::collections::HashMap;
+        #[cfg(feature = "auth-config-backend")]
+        parse_test!(config_backend(type_defs::Config): toml!{
+            session_duration = "1h"
+        } => type_defs::Config {
+            config: backends::config::Config {
+                users: vec![],
+                roles: HashMap::new(),
+                session_duration: chrono::Duration::hours(1)
+            }
+        });
+    }
+}

@@ -49,6 +49,7 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
+        #[cfg(feature = "auth")]
         Command::Auth(command) => if let Err(()) = command.command.run() {
             return ExitCode::FAILURE;
         }

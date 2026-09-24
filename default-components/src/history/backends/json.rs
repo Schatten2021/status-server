@@ -32,6 +32,7 @@ impl Default for Config {
 }
 
 #[derive(Clone, Debug)]
+#[deprecated]
 pub struct FsJsonBackend {
     config: Config,
 }

@@ -11,6 +11,7 @@ use crate::auth::type_defs::AttributeMap;
 #[serde(rename_all="lowercase")]
 pub enum Password {
     Plaintext(String),
+    #[serde(alias="hash")]
     Hashed(String),
 }
 impl Default for Password {
@@ -53,11 +54,11 @@ fn day() -> chrono::Duration { chrono::Duration::days(1) }
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Config {
     #[serde(alias="user", default)]
-    users: Vec<ConfigUser>,
+    pub users: Vec<ConfigUser>,
     #[serde(alias="role", default)]
-    roles: HashMap<String, Role>,
+    pub roles: HashMap<String, Role>,
     #[serde(with="utils::duration_parsing", default="day")]
-    session_duration: chrono::Duration,
+    pub session_duration: chrono::Duration,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -169,5 +170,101 @@ impl super::Backend for ConfigAuthBackend {
         Ok(tri!(self.roles.get(role_id))
             .attributes.get(attribute_id).cloned()
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    mod parsing {
+        use super::super::*;
+        use crate::parse_test;
+        parse_test!(empty(Config): toml::Table::new() => Config {
+            users: vec![],
+            roles: HashMap::new(),
+            session_duration: day(),
+        });
+        parse_test!(user_empty(ConfigUser): toml::Table::new() => error);
+        parse_test!(user_minimal_plain(ConfigUser): toml!{
+            username = "foo"
+            password.plaintext = "bar"
+        } => ConfigUser {
+            username: "foo".to_string(),
+            password: Password::Plaintext("bar".to_string()),
+            roles: HashSet::new(),
+            attributes: HashMap::new(),
+        });
+        parse_test!(user_minimal_hashed(ConfigUser): toml!{
+            username = "foo"
+            password.hash = "bar"
+        } => ConfigUser {
+            username: "foo".to_string(),
+            password: Password::Hashed("bar".to_string()),
+            roles: HashSet::new(),
+            attributes: HashMap::new(),
+        });
+        parse_test!(user_maximum(ConfigUser): toml!{
+            username = "foo"
+            password.plaintext = "bar"
+            roles = ["admin"]
+            attributes.email = "foo@example.com"
+        } => ConfigUser {
+            username: "foo".to_string(),
+            password: Password::Plaintext("bar".to_string()),
+            roles: HashSet::from(["admin".to_string()]),
+            attributes: HashMap::from([("email".to_string(), ByteCode::String("foo@example.com".to_string()))]),
+        });
+        parse_test!(role_emtpy(Role): toml::Table::new() => Role {
+            attributes: HashMap::new(),
+        });
+        parse_test!(role_filled(Role): toml![attributes.ignores_api_rules = true] => Role {
+            attributes: HashMap::from([("ignores_api_rules".to_string(), ByteCode::Bool(true))]),
+        });
+        parse_test!(with_user(Config): toml!{
+            [[user]]
+            username = "foo"
+            password.plaintext = "bar"
+        } => Config {
+            users: vec![ConfigUser {
+                username: "foo".to_string(),
+                password: Password::Plaintext("bar".to_string()),
+                roles: HashSet::new(),
+                attributes: HashMap::new(),
+            }],
+            roles: HashMap::new(),
+            session_duration: day(),
+        });
+        parse_test!(with_role(Config): toml!{
+            [role.example]
+        } => Config {
+            users: vec![],
+            roles: HashMap::from([("example".to_string(), Role::default())]),
+            session_duration: day(),
+        });
+        parse_test!(with_session_duration(Config): toml!{session_duration = "1h"} => Config {
+            users: vec![],
+            roles: HashMap::new(),
+            session_duration: chrono::Duration::hours(1),
+        });
+        parse_test!(full(Config): toml!{
+            session_duration = "1h"
+            [[user]]
+            username = "foo"
+            password.hash = "bar"
+            roles = ["example"]
+            [role.example]
+            attributes.ignore_api_rules = true
+
+        } => Config {
+            users: vec![ConfigUser {
+                username: "foo".to_string(),
+                password: Password::Hashed("bar".to_string()),
+                roles: HashSet::from(["example".to_string()]),
+                attributes: HashMap::new(),
+            }],
+            roles: HashMap::from([("example".to_string(), Role {
+                attributes: HashMap::from([("ignore_api_rules".to_string(), ByteCode::Bool(true))])
+            })]),
+            session_duration: chrono::Duration::hours(1),
+        });
     }
 }
