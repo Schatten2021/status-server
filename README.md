@@ -67,7 +67,8 @@ can use `email.status`; NOTE: `notify` are also aliased as `notifications`). The
 | website    | `website`   | `status`   | website-status      | [ref](docs/config/website.md)    |
 | dataminer  | `miner`     | `status`   | dataminer-status    | [ref](docs/config/dataminer.md)  |
 | names      | `names`     | none       | names               | [ref](docs/config/names.md)      |
-| history    | `history`   | none       | history (+ backend) |                                  |
+| history    | `history`   | none       | history (+ backend) | [ref](docs/config/history.md)    |
+| auth       | `auth`      | none       | auht (+ backend)    | [ref](docs/config/auth.md)       |
 
 Additionally, many configurations use [filters](docs/config/filter.md) to provide a uniform filtering interface.
 

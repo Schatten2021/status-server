@@ -98,7 +98,7 @@ impl User {
         ignores_default_api_rules: false,
     };
     pub fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, AccessError> {
-        const IGNORES_SESSION_ATTRIBUTE_ID: &str = "ignores_api_rules";
+        const IGNORES_SESSION_ATTRIBUTE_IDS: &[&str] = &["ignores_api_rules", "ignore_api_rules"];
         use bytecode::ByteCode;
 
         let Some(session_id) = session_id else { return Ok(Self::UNAUTHED); };
@@ -106,20 +106,26 @@ impl User {
         let Some(auth): Option<Auth> = state.component_map(|opt| opt.cloned()) else { return Ok(Self::UNAUTHED); };
         let Some(user_id) = auth.user_id_from_session(&session_id)? else { return Ok(Self::UNAUTHED); };
         let is_admin = auth.has_role(&user_id, &"admin".to_string())?.unwrap_or(false);
+        let mut ignores_default_api_rules = false;
         #[expect(clippy::single_match_else, reason="using a match here is clearer.")]
-        let ignores_default_api_rules = match auth.user_get_attribute(&user_id, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
-            Some(ByteCode::Bool(val)) => val,
-            _ => {
-                let mut result = false;
-                for role in auth.user_roles(&user_id)?.unwrap_or_default() {
-                    if let Some(ByteCode::Bool(val)) = auth.role_get_attribute(&role, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
-                        result = val;
-                        break;
+        for attribute_id in IGNORES_SESSION_ATTRIBUTE_IDS {
+            match auth.user_get_attribute(&user_id, &attribute_id.to_string())? {
+                Some(ByteCode::Bool(val)) => {
+                    ignores_default_api_rules = val;
+                    break
+                },
+                _ => {
+                    let mut result = false;
+                    for role in auth.user_roles(&user_id)?.unwrap_or_default() {
+                        if let Some(ByteCode::Bool(val)) = auth.role_get_attribute(&role, &attribute_id.to_string())? {
+                            result = val;
+                            break;
+                        }
                     }
+                    ignores_default_api_rules |= result;
                 }
-                result
             }
-        };
+        }
         Ok(Self {
             is_admin,
             ignores_default_api_rules,
