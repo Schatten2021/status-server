@@ -24,4 +24,4 @@ jobs:
       - name: Run clippy on workspace
         run: |
           cargo clippy --workspace --all-targets -- -D warnings
-          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo clippy --workspace --all-targets --all-features -- -D warnings -A deprecated

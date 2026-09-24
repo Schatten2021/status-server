@@ -1,3 +1,4 @@
+#![allow(deprecated, reason="this entire module is deprecated; if we don't allow it, this would trip up clippy massively.")]
 use crate::history::{OnlineStateHistory, PropertyHistory};
 use server::ComponentHandle;
 use std::error::Error;
