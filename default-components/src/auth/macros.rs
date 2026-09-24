@@ -109,11 +109,11 @@ macro_rules! main_struct {
                 Ok(result)
             }
             pub(crate) fn role_attributes(&self, role_id: &RoleId) -> Result<Option<AttributeMap>, $access_error_type> {
-                $($crate::auth::macros::main_struct!(@internal:func_call if $feature: $backend::role_attributes(&self.$field_name, role_id) -> $access_error_type))*
+                $($crate::auth::macros::main_struct!(@internal:func_call if $feature: $backend::role_attributes(&self.$field_name, role_id) -> $access_error_type);)*
                 Ok(None)
             }
             pub(crate) fn role_get_attribute(&self, role_id: &RoleId, attribute_id: &AttributeId) -> Result<Option<::bytecode::ByteCode>, $access_error_type> {
-                $($crate::auth::macros::main_struct!(@internal:func_call if $feature: $backend::role_get_attribute(&self.$field_name, role_id, attribute_id) -> $access_error_type))*
+                $($crate::auth::macros::main_struct!(@internal:func_call if $feature: $backend::role_get_attribute(&self.$field_name, role_id, attribute_id) -> $access_error_type);)*
                 Ok(None)
             }
         }

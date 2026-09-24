@@ -155,7 +155,7 @@ impl super::Backend for ConfigAuthBackend {
 
     fn role_users(&self, role_id: &RoleId) -> Result<Vec<UserId>, Self::AccessError> {
         Ok(self.users.iter()
-            .filter(|(id, user)| user.roles.contains(role_id))
+            .filter(|(_id, user)| user.roles.contains(role_id))
             .map(|(id, _)| id.clone())
             .collect()
         )

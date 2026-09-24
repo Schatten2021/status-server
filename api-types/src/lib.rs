@@ -249,6 +249,8 @@ pub mod history {
             element_id: String,
             /// The attribute whose history is being requested.
             attribute_id: String,
+            /// The id of the session that the user is logged in with (if they are logged in).
+            session_id: Option<String>,
         }
     );
     api_type!(
@@ -272,6 +274,8 @@ pub mod history {
         struct OnlineStateHistoryRequest {
             /// The id of the element whose online-state history is being requested.
             element_id: String,
+            /// The id of the session that the user is logged in with (if they are logged in).
+            session_id: Option<String>,
         }
     );
     api_type!(
