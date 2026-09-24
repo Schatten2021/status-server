@@ -7,8 +7,8 @@ edition = "2024"
 # utils
 filters = []
 # api/web "notifications"
-api = ["filters", "dep:api-types", "dep:serde_json", "dep:axum"]
-websockets = ["filters", "dep:api-types", "dep:tokio", "dep:serde_json", "dep:axum", "axum/ws"]
+api = ["filters", "dep:api-types", "dep:serde_json", "dep:axum", "dep:tokio"]
+websockets = ["filters", "dep:api-types", "dep:tokio", "dep:serde_json", "dep:axum", "axum/ws", "dep:futures-util"]
 frontend = ["api", "websockets"]
 # notifications
 ntfy-notifications = ["filters", "dep:url", "dep:tokio", "dep:strfmt", "dep:reqwest"]
@@ -19,6 +19,8 @@ minecraft-status = ["dep:chrono", "dep:serde_json", "dep:minecraft-net", "dep:to
 website-status = ["filters", "dep:reqwest", "dep:chrono", "dep:tokio"]
 # other
 names = []
+auth = ["dep:async-trait", "dep:rand"]
+auth-config-backend = ["dep:argon2", "argon2/password-hash", "utils/duration-parsing"]
 #historization
 history = ["dep:thiserror"]
 history-fs-json-backend = ["history", "dep:serde_json"]
@@ -28,15 +30,16 @@ history-sqlite-backend = ["history", "dep:rusqlite", "rusqlite/bundled", "rusqli
 # definitions for better mass importing
 all-utils = ["filters"]
 all-status = ["dataminer-status", "minecraft-status", "website-status"]
-all-other = ["names", "history"]
+all-other = ["names", "history", "auth"]
 all-history-backends = ["history-fs-json-backend", "history-sqlite-backend"]
+all-auth-backends = ["auth-config-backend"]
 all-notifications = [
     "api", "websockets", "frontend",
     "email-notifications", "ntfy-notifications"
 ]
-all = ["all-utils", "all-status", "all-notifications", "all-other"]
+all = ["all-utils", "all-status", "all-notifications", "all-other", "all-history-backends", "all-auth-backends"]
 
-default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend"]
+default = ["all-status", "all-notifications", "all-other", "history-sqlite-backend", "all-auth-backends"]
 
 [dependencies]
 # used in basically every scenario
@@ -58,6 +61,8 @@ axum = { workspace = true, optional = true }
 # api
 api-types = { workspace = true, features = ["server-support"], optional = true }
 serde_json = { version = "1", optional = true }
+# websocket
+futures-util = { version = "0.3", optional = true }
 
 # NTFY
 url = { version = "2.5", features = ["serde"], optional = true }
@@ -65,10 +70,15 @@ strfmt = { version = "0.2", optional = true }
 
 # E-Mail
 lettre = { version = "0.11", optional = true }
-minecraft-net = { version = "0.1.0", optional = true }
+minecraft-net = { version = "0.3", optional = true }
 
 # historization
 rusqlite =  { version = "0.40", optional = true }
+
+# auth
+rand = { version = "0.10", optional = true }
+async-trait = { version = "0.1", optional = true }
+argon2 = { workspace = true, optional = true }
 
 [dev-dependencies]
 toml = "1.1"

@@ -41,6 +41,7 @@ pub fn check(path_: &PathBuf) -> Result<(), ()> {
     component!(if "minecraft-status": MinecraftStatus);
     component!(if "website-status": WebsiteStatuse);
     component!(if "history": History);
+    component!(if "auth": Auth);
     if ok {
         info!("all config is OK");
         Ok(())

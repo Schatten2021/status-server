@@ -59,6 +59,10 @@ fn should_handle_path(mut path: &str, mut prefix: &str) -> bool {
         "/current"
     )
         || (cfg!(feature = "history") && matches!(path, "/history/attribute" | "/history/online"))
+        || (cfg!(feature = "auth") && (
+            matches!(path, "/login" | "/authenticated/current")
+            || cfg!(feature = "history") && matches!(path, "/authenticated/history/attribute" | "/authenticated/history/online")
+        ))
 }
 #[derive(Clone, Default, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ConfigWrapper {
@@ -102,12 +106,14 @@ impl server::Component for Api {
             let _ = request;
             let (code, json) = match path {
                 "/" => handles::index(),
-                "/current" => handles::current(&state, &element_filter, &attribute_filter),
+                "/current" => handles::current(request, &state, &element_filter, &attribute_filter).await,
                 // TODO: add routes for requesting selected elements/stati/etc.
                 #[cfg(feature = "history")]
                 "/history/attribute" => handles::history_attribute(request, &state, &attribute_filter, &element_filter).await,
                 #[cfg(feature = "history")]
                 "/history/online" => handles::history_online(request, &state, &element_filter).await,
+                #[cfg(feature = "auth")]
+                "/login" => handles::login(request, &state).await,
                 _ => handles::default(path)
             };
             axum::response::Response::builder()
@@ -164,6 +170,7 @@ mod handles {
             };
         }
 
+    use axum::extract::{FromRequest, Json};
     use std::collections::HashMap;
     use axum::extract::Request;
     use server::ComponentHandle;
@@ -172,7 +179,22 @@ mod handles {
     pub fn index() -> (u16, String) {
         ok!("Welcome to the API!")
     }
-    pub fn current(state: &ComponentHandle, element_filter: &SingleFilter<String>, attribute_filter: &SingleFilter<AttributeIdMatcher>) -> (u16, String) {
+    pub async fn current(request: Request, state: &ComponentHandle, element_filter: &SingleFilter<String>, attribute_filter: &SingleFilter<AttributeIdMatcher>) -> (u16, String) {
+        use axum::extract::rejection::JsonRejection;
+        #[cfg(feature = "auth")]
+        let user = match Json::<api_types::auth::Authentication>::from_request(request, &()).await {
+            Ok(Json(api_types::auth::Authentication { session_id })) => match crate::auth::User::from_session_id(Some(session_id), state) {
+                Ok(v) => v,
+                Err(e) => return exception!("auth.internal", e.to_string()),
+            },
+            Err(JsonRejection::MissingJsonContentType(_)) => crate::auth::User::UNAUTHED,
+            Err(_e) => return err!(400, "invalid authentication request.")
+        };
+        #[cfg(feature = "auth")]
+        if user.is_admin || user.ignores_default_api_rules {
+            trace!("user is ignoring rules.");
+            return ok!(api_types::States::from(state.get_states()))
+        }
         ok!(api_types::States::from(state.get_states()
             .into_iter()
             .filter(|(id, _)| element_filter.allows(id))
@@ -190,14 +212,27 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing element_id or attribute_id"),
         };
+        #[cfg(feature = "auth")]
+        let user = match crate::auth::User::from_session_id(args.session_id, state) {
+            Ok(v) => v,
+            Err(e) => return exception!("auth.internal", e.to_string()),
+        };
+
         if !element_filter.allows(&args.element_id) || !attribute_filter.allows(&args.attribute_id) {
+            #[cfg(feature = "auth")]
+            if user.is_admin || user.ignores_default_api_rules {
+                trace!("user ignoring rules.");
+            } else {
+                return err!(404, "invalid element/attribute id");
+            }
+            #[cfg(not(feature = "auth"))]
             return err!(404, "invalid element/attribute id");
         }
         let history = state.component_map::<crate::History, _, _>(|hist| {
             hist.map(|hist| hist.get_attribute_history(&args.element_id, &args.attribute_id))
         });
         match history {
-            None => err!(404, "invalid element/attribute id"),
+            None => err!(404, "Historization not active"),
             Some(Err(e)) => exception!("history.internal", e.to_string()),
             Some(Ok(v)) => ok!(api_types::history::AttributeHistory(v.into_iter()
                 .map(|(timestamp, new_val)| api_types::history::AttributeHistoryElement {
@@ -209,21 +244,32 @@ mod handles {
         }
     }
     #[cfg(feature = "history")]
-    #[allow(clippy::result_large_err, reason="err is when we fail to read the response")]
     pub async fn history_online(request: Request, state: &ComponentHandle, element_filter: &SingleFilter<String>) -> (u16, String) {
         use axum::extract::{FromRequest, Json};
         let Json(args): Json<api_types::history::OnlineStateHistoryRequest> = match Json::from_request(request, &()).await {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing element_id"),
         };
+        #[cfg(feature = "auth")]
+        let user = match crate::auth::User::from_session_id(args.session_id, state) {
+            Ok(v) => v,
+            Err(e) => return exception!("auth.internal", e.to_string()),
+        };
         if !element_filter.allows(&args.element_id) {
+            #[cfg(feature = "auth")]
+            if user.is_admin || user.ignores_default_api_rules {
+                trace!("user ignoring rules.");
+            } else {
+                return err!(404, "invalid element id");
+            }
+            #[cfg(not(feature = "auth"))]
             return err!(404, "invalid element id");
         }
         let history = state.component_map::<crate::History, _, _>(|hist| {
             hist.map(|hist| hist.get_online_state_history(&args.element_id))
         });
         match history {
-            None => err!(404, "invalid element id"),
+            None => err!(404, "History not enabled"),
             Some(Err(e)) => exception!("history.internal", e.to_string()),
             Some(Ok(v)) => ok!(api_types::history::OnlineStateHistory(v.into_iter()
                             .map(|(timestamp, new_val)| api_types::history::OnlineStateHistoryElement {
@@ -232,6 +278,25 @@ mod handles {
                             })
                             .collect()
                         )),
+        }
+    }
+    #[cfg(feature = "auth")]
+    pub async fn login(request: Request, state: &ComponentHandle) -> (u16, String) {
+        use axum::extract::{FromRequest, Json};
+        let Json(args): Json<api_types::auth::LoginRequest> = match Json::from_request(request, &()).await {
+            Ok(v) => v,
+            Err(_e) => return err!(400, "missing username/password"),
+        };
+        let session_id = state.component_map::<crate::Auth, _, _>(move |component| {
+            component.map(move |auth| {
+                auth.try_login(&args.username, &args.password)
+            })
+        });
+        match session_id {
+            None => err!(404, "Auth not enabled."),
+            Some(Ok(Some(v))) => ok!(api_types::auth::LoginResponse { session_id: v }),
+            Some(Ok(None)) => err!(401, "invalid username/password"),
+            Some(Err(e)) => exception!("auth.internal", e.to_string()),
         }
     }
     pub fn default(path: &str) -> (u16, String) {

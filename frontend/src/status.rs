@@ -15,29 +15,35 @@ impl From<api_types::State> for Element {
         }
     }
 }
-pub struct AppState(pub HashMap<String, Element>);
+pub struct AppState {
+    pub data:  HashMap<String, Element>,
+    pub session_id: Option<String>
+}
 impl From<api_types::States> for AppState {
     fn from(value: api_types::States) -> Self {
-        Self(value.0.into_iter()
-            .map(|(a, b)| (a, b.into()))
-            .collect())
+        Self {
+            data: value.0.into_iter()
+                .map(|(a, b)| (a, b.into()))
+                .collect(),
+            session_id: None,
+        }
     }
 }
 impl AppState {
     pub fn handle(&mut self, message: Message) {
         if matches!(message.reason, MessageReason::OnlineStatus(OnlineStatusChange::Delete)) {
-            self.0.remove(&message.element_id);
+            self.data.remove(&message.element_id);
             return;
         }
         #[expect(clippy::single_match_else, reason="is just more readable this way.")]
-        let element = match self.0.get_mut(&message.element_id) {
+        let element = match self.data.get_mut(&message.element_id) {
             Some(e) => e,
             None => {
-                self.0.insert(message.element_id.clone(), Element {
+                self.data.insert(message.element_id.clone(), Element {
                     online: false,
                     attributes: HashMap::new(),
                 });
-                self.0.get_mut(&message.element_id).unwrap()
+                self.data.get_mut(&message.element_id).unwrap()
             }
         };
         element.handle(message.reason);

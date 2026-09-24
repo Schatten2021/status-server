@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use axum::extract::Request;
+use axum::extract::ws::Message;
 use axum::response::IntoResponse;
+use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{Mutex, RwLock};
 
 use utils::Never;
@@ -39,23 +41,26 @@ impl Default for Config {
 
 
 struct Socket {
-    ws: Mutex<axum::extract::ws::WebSocket>,
+    ws: Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>,
     online: AtomicBool,
+    #[cfg(feature = "auth")]
+    user: RwLock<crate::auth::User>,
 }
 
 /// Provides Websockets at the configured path, sending [`Notification`]s via the Socket.
 pub struct Websockets {
-    sockets: Arc<RwLock<Vec<Socket>>>,
+    sockets: Arc<RwLock<Vec<Arc<Socket>>>>,
     config: Config,
+    state: ComponentHandle
 }
 impl server::Component for Websockets {
     const ID: &'static str = "sockets";
     type Config = crate::Notification<Config>;
     type ConfigError = Never;
 
-    fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+    fn init(state: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
         let config = config.notification;
-        let websockets = Arc::new(RwLock::new(Vec::<Socket>::new()));
+        let websockets = Arc::new(RwLock::new(Vec::<Arc<Socket>>::new()));
         let mut ticker = tokio::time::interval(Duration::from_mins(30));
         let ws = websockets.clone();
         tokio::spawn(async move {
@@ -70,6 +75,7 @@ impl server::Component for Websockets {
         Ok(Self {
             sockets: websockets,
             config,
+            state,
         })
     }
 
@@ -81,6 +87,7 @@ impl server::Component for Websockets {
     fn try_handle(&self, request: Request) -> Result<RequestHandle, Request> {
         if !self.config.paths.contains(request.uri().path()) { return Err(request) }
         let websockets = self.sockets.clone();
+        let state= self.state.clone();
         Ok(Box::pin(async move {
             use axum::extract::{
                 ws::WebSocketUpgrade,
@@ -88,12 +95,47 @@ impl server::Component for Websockets {
             };
             match WebSocketUpgrade::from_request(request, &()).await {
                 Ok(upgrade) => {
-                    upgrade.on_upgrade(|socket| async move {
-                        let socket = Socket {
-                            ws: Mutex::new(socket),
+                    upgrade.on_upgrade(move |socket| async move {
+                        let (sender, mut receiver) = socket.split();
+                        let socket = Arc::new(Socket {
+                            ws: Mutex::new(sender),
                             online: AtomicBool::new(true),
-                        };
-                        websockets.write().await.push(socket);
+                            #[cfg(feature="auth")]
+                            user: RwLock::new(crate::auth::User::UNAUTHED),
+                        });
+                        websockets.write().await.push(socket.clone());
+                        tokio::spawn(async move {
+                            while let Some(Ok(msg)) = receiver.next().await {
+                                match msg {
+                                    Message::Text(txt) => {
+                                        let content: api_types::websocket::UpstreamMessage = match serde_json::from_str(txt.as_str()) {
+                                            Ok(v) => v,
+                                            Err(e) => {
+                                                error!("received invalid JSON via websocket: {e}");
+                                                continue
+                                            }
+                                        };
+                                        match content {
+                                            #[cfg(feature = "auth")]
+                                            api_types::websocket::UpstreamMessage::Login(session_id) => {
+                                                let user = match crate::auth::User::from_session_id(Some(session_id), &state) {
+                                                    Ok(u) => u,
+                                                    Err(e) => {
+                                                        error!("error accessing user: {e}");
+                                                        continue;
+                                                    }
+                                                };
+                                                *socket.user.write().await = user;
+                                            }
+                                            #[cfg(not(feature="auth"))]
+                                            api_types::websocket::UpstreamMessage::Login(_) => {}
+                                        }
+                                    }
+                                    _ => continue,
+                                }
+                            }
+                            socket.online.store(false, Ordering::Relaxed);
+                        });
                     })
                 }
                 Err(e) => e.into_response(),
@@ -104,7 +146,7 @@ impl server::Component for Websockets {
 impl server::NotificationProvider for Websockets {
     fn notify(&self, notification: Notification) {
         use axum::extract::ws::{Message, Utf8Bytes};
-        if !self.config.filter.allows(&notification) { return;}
+        let is_allowed = self.config.filter.allows(&notification);
         let sockets = self.sockets.clone();
         let message: Utf8Bytes = match serde_json::to_string(&api_types::websocket::Message::from(notification)) {
             Ok(v) => v,
@@ -116,7 +158,9 @@ impl server::NotificationProvider for Websockets {
         tokio::spawn(async move {
             let sockets = sockets;
             for socket in sockets.read().await.iter() {
-                if !socket.online.load(Ordering::Relaxed) {
+                let user = socket.user.read().await;
+                if !socket.online.load(Ordering::Relaxed) ||
+                    !is_allowed && !user.is_admin && !user.ignores_default_api_rules {
                     continue;
                 }
                 let msg = message.clone();

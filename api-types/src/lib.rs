@@ -237,6 +237,13 @@ pub mod websocket {
             }
         }
     }
+    api_type!(
+        /// Messages that can be sent to the server via the websocket.
+        enum UpstreamMessage {
+            /// Represents that the user has logged in with the given session-id.
+            Login(String),
+        }
+    );
 }
 pub mod history {
     //! Types for requesting the History of an element's online-state or attribute.
@@ -249,6 +256,8 @@ pub mod history {
             element_id: String,
             /// The attribute whose history is being requested.
             attribute_id: String,
+            /// The id of the session that the user is logged in with (if they are logged in).
+            session_id: Option<String>,
         }
     );
     api_type!(
@@ -272,6 +281,8 @@ pub mod history {
         struct OnlineStateHistoryRequest {
             /// The id of the element whose online-state history is being requested.
             element_id: String,
+            /// The id of the session that the user is logged in with (if they are logged in).
+            session_id: Option<String>,
         }
     );
     api_type!(
@@ -287,4 +298,43 @@ pub mod history {
         /// The entire history of a single element's online-state
         struct OnlineStateHistory(Vec<OnlineStateHistoryElement>)
     );
+}
+pub mod auth {
+    //! Types for interacting with the authentication API.
+
+    use crate::ApiType;
+
+    api_type!(
+        /// attempts to log into the server
+        struct LoginRequest {
+            /// The username of the user
+            username: String,
+            /// The password of the user
+            password: String,
+        }
+    );
+    api_type!(
+        /// Response received upon successful login
+        struct LoginResponse {
+            /// The ID of the session used for further authentication.
+            session_id: String,
+        }
+    );
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+    #[expect(private_bounds, reason="this is supposed to be private to prevent accidentally sending\
+    the wrong type that might not be understood by the server.")]
+    /// Generic wrapper around the `/authenticated/*` api routes.
+    pub struct AuthenticatedRequest<T: ApiType> {
+        /// The session ID as received from a [`LoginResponse`].
+        pub session_id: String,
+
+        /// The actual content of the request.
+        pub content: T,
+    }
+    #[derive(Clone, Debug, PartialEq, serde::Deserialize, serde::Serialize)]
+    /// For requests that merely need to assert that the connected client is authenticated.
+    pub struct Authentication {
+        /// The session ID as received from a [`LoginResponse`].
+        pub session_id: String,
+    }
 }
