@@ -53,6 +53,7 @@ pub(crate) struct GlobalState {
     pub(crate) config_path: RwLock<PathBuf>,
     pub(crate) components: RwLock<TypeMap<ComponentInfo>>,
     pub(crate) tasks: std::sync::mpsc::Sender<Task>,
+    pub(crate) tokio_handle: tokio::runtime::Handle,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct ComponentInfo {
@@ -113,6 +114,7 @@ impl GlobalState {
             config_path: RwLock::new(config_path),
             components: RwLock::new(TypeMap::new()),
             tasks: sender,
+            tokio_handle: tokio::runtime::Handle::current(),
         });
         let this_ = this.clone();
         std::thread::spawn(move || super::backend::backend_thread(receiver, this_, runtime));

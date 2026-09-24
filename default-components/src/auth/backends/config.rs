@@ -52,9 +52,9 @@ pub struct Role {
 fn day() -> chrono::Duration { chrono::Duration::days(1) }
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Config {
-    #[serde(alias="user")]
+    #[serde(alias="user", default)]
     users: Vec<ConfigUser>,
-    #[serde(alias="role")]
+    #[serde(alias="role", default)]
     roles: HashMap<String, Role>,
     #[serde(with="utils::duration_parsing", default="day")]
     session_duration: chrono::Duration,

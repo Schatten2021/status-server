@@ -18,6 +18,7 @@
 
 mod status;
 mod element_display;
+mod auth_page;
 
 #[macro_use]
 extern crate tracing;
@@ -61,6 +62,7 @@ struct App {
     state: Option<AppState>,
 }
 enum AppMessage {
+    Authenticated(String),
     LoadedInitial(AppState),
     ReceivedMessage(api_types::websocket::Message),
 }
@@ -125,17 +127,40 @@ impl yew::Component for App {
                 });
             },
             AppMessage::ReceivedMessage(msg) => self.state.as_mut().expect("received websocket message before state was set")
-                .handle(msg)
+                .handle(msg),
+            AppMessage::Authenticated(session_id) => {
+                let link = ctx.link().clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let initial: ApiResponse<States, ()> = gloo_net::http::Request::post("/api/current")
+                        .json(&api_types::auth::Authentication { session_id: session_id.clone() }).expect("unable to serialize Authentication JSON")
+                        .send().await.expect("unable to send request to /api/current")
+                        .json().await.expect("unable to read api response from /api/current");
+                    let mut data = match initial {
+                        ApiResponse::Ok(v) => AppState::from(v),
+                        ApiResponse::ServerError(e) => {
+                            error!("server error `{}`: {}", e.id, e.message);
+                            return;
+                        }
+                        ApiResponse::ClientError(()) => panic!("something went wrong...")
+                    };
+                    data.session_id = Some(session_id);
+                    link.send_message(Self::Message::LoadedInitial(data));
+                });
+            }
         }
         true
     }
-    fn view(&self, _: &Context<Self>) -> Html {
+    fn view(&self, ctx: &Context<Self>) -> Html {
         let Some(state) = &self.state else {
             return html!(<p>{"loading state from server..."}</p>)
         };
-        state.0.iter()
+        let content_html = state.data.iter()
             .map(|(a, b)| (a.clone(), b.clone()))
-            .map(|(id, val)| html!(<element_display::ElementDisplay id={id} element={val}/>))
-            .collect::<Html>()
+            .map(|(id, val)| html!(<element_display::ElementDisplay id={id} element={val}/>));
+        if state.session_id.is_none() {
+            content_html.chain([html!{<auth_page::LoginPage on_login={ctx.link().callback(AppMessage::Authenticated)}/>}]).collect::<Html>()
+        } else {
+            content_html.collect::<Html>()
+        }
     }
 }

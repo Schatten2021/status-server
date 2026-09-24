@@ -41,19 +41,22 @@ impl Default for Config {
 struct Socket {
     ws: Mutex<axum::extract::ws::WebSocket>,
     online: AtomicBool,
+    #[cfg(feature = "auth")]
+    user: crate::auth::User,
 }
 
 /// Provides Websockets at the configured path, sending [`Notification`]s via the Socket.
 pub struct Websockets {
     sockets: Arc<RwLock<Vec<Socket>>>,
     config: Config,
+    state: ComponentHandle
 }
 impl server::Component for Websockets {
     const ID: &'static str = "sockets";
     type Config = crate::Notification<Config>;
     type ConfigError = Never;
 
-    fn init(_: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
+    fn init(state: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
         let config = config.notification;
         let websockets = Arc::new(RwLock::new(Vec::<Socket>::new()));
         let mut ticker = tokio::time::interval(Duration::from_mins(30));
@@ -70,6 +73,7 @@ impl server::Component for Websockets {
         Ok(Self {
             sockets: websockets,
             config,
+            state,
         })
     }
 
@@ -81,17 +85,43 @@ impl server::Component for Websockets {
     fn try_handle(&self, request: Request) -> Result<RequestHandle, Request> {
         if !self.config.paths.contains(request.uri().path()) { return Err(request) }
         let websockets = self.sockets.clone();
+        let state= self.state.clone();
         Ok(Box::pin(async move {
             use axum::extract::{
                 ws::WebSocketUpgrade,
                 FromRequest,
             };
+            #[cfg(feature = "auth")]
+            let user = match request.headers().get("Authorization") {
+                None => {
+                    trace!("no Authorization header");
+                    crate::auth::User::UNAUTHED
+                },
+                Some(auth) => match auth.to_str().map(ToString::to_string) {
+                    Ok(v) => match crate::auth::User::from_session_id(Some(v), &state) {
+                        Ok(u) => {
+                            trace!("logged in user connecting to websocket: {u:?}");
+                            u
+                        }
+                        Err(e) => {
+                            error!("error accessing user: {e}");
+                            crate::auth::User::UNAUTHED
+                        },
+                    },
+                    Err(e) => {
+                        trace!("invalid authorization header: {e}");
+                        crate::auth::User::UNAUTHED
+                    },
+                }
+            };
             match WebSocketUpgrade::from_request(request, &()).await {
                 Ok(upgrade) => {
-                    upgrade.on_upgrade(|socket| async move {
+                    upgrade.on_upgrade(move |socket| async move {
                         let socket = Socket {
                             ws: Mutex::new(socket),
                             online: AtomicBool::new(true),
+                            #[cfg(feature="auth")]
+                            user,
                         };
                         websockets.write().await.push(socket);
                     })
@@ -104,7 +134,7 @@ impl server::Component for Websockets {
 impl server::NotificationProvider for Websockets {
     fn notify(&self, notification: Notification) {
         use axum::extract::ws::{Message, Utf8Bytes};
-        if !self.config.filter.allows(&notification) { return;}
+        let is_allowed = self.config.filter.allows(&notification);
         let sockets = self.sockets.clone();
         let message: Utf8Bytes = match serde_json::to_string(&api_types::websocket::Message::from(notification)) {
             Ok(v) => v,
@@ -116,7 +146,8 @@ impl server::NotificationProvider for Websockets {
         tokio::spawn(async move {
             let sockets = sockets;
             for socket in sockets.read().await.iter() {
-                if !socket.online.load(Ordering::Relaxed) {
+                if !socket.online.load(Ordering::Relaxed) ||
+                    !is_allowed && !socket.user.is_admin && !socket.user.ignores_default_api_rules {
                     continue;
                 }
                 let msg = message.clone();

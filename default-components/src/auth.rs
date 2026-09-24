@@ -81,3 +81,46 @@ impl Auth {
         fn role_get_attribute(&self, role_id: &RoleId, attribute_id: &String) -> Result<Option<bytecode::ByteCode>, AccessError>;
     );
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct User {
+    pub is_admin: bool,
+    pub ignores_default_api_rules: bool,
+}
+impl Default for User {
+    fn default() -> Self {
+        Self::UNAUTHED
+    }
+}
+impl User {
+    pub const UNAUTHED: Self = Self {
+        is_admin: false,
+        ignores_default_api_rules: false,
+    };
+    pub fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, crate::auth::AccessError> {
+        const IGNORES_SESSION_ATTRIBUTE_ID: &str = "ignores_api_rules";
+        use bytecode::ByteCode;
+
+        let Some(session_id) = session_id else { return Ok(Self::UNAUTHED); };
+        let Some(auth): Option<crate::Auth> = state.component_map(|opt| opt.cloned()) else { return Ok(Self::UNAUTHED); };
+        let Some(user_id) = auth.user_id_from_session(&session_id)? else { return Ok(Self::UNAUTHED); };
+        let is_admin = auth.has_role(&user_id, &"admin".to_string())?.unwrap_or(false);
+        let ignores_default_api_rules = match auth.user_get_attribute(&user_id, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
+            Some(ByteCode::Bool(val)) => val,
+            _ => {
+                let mut result = false;
+                for role in auth.user_roles(&user_id)?.unwrap_or_default() {
+                    if let Some(ByteCode::Bool(val)) = auth.role_get_attribute(&role, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
+                        result = val;
+                        break;
+                    }
+                }
+                result
+            }
+        };
+        Ok(Self {
+            is_admin,
+            ignores_default_api_rules,
+        })
+    }
+}

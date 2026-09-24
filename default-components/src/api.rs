@@ -174,77 +174,36 @@ mod handles {
     use std::collections::HashMap;
     use axum::extract::Request;
     use server::ComponentHandle;
-    use crate::auth::SessionId;
     use crate::filters::{AttributeIdMatcher, SingleFilter};
-    #[cfg(feature = "auth")]
-    struct User {
-        is_admin: bool,
-        ignores_default_api_rules: bool,
-    }
-    impl User {
-        const UNAUTHED: Self = Self {
-            is_admin: false,
-            ignores_default_api_rules: false,
-        };
-        #[cfg(feature = "auth")]
-        fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, crate::auth::AccessError> {
-            const IGNORES_SESSION_ATTRIBUTE_ID: &str = "ignores_api_rules";
-            use bytecode::ByteCode;
-
-            let Some(session_id) = session_id else { return Ok(Self::UNAUTHED); };
-            let Some(auth): Option<crate::Auth> = state.component_map(|opt| opt.cloned()) else { return Ok(Self::UNAUTHED); };
-            let Some(user_id) = auth.user_id_from_session(&session_id)? else { return Ok(Self::UNAUTHED); };
-            let is_admin = auth.has_role(&user_id, &"admin".to_string())?.unwrap_or(false);
-            let ignores_default_api_rules = match auth.user_get_attribute(&user_id, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
-                Some(ByteCode::Bool(val)) => val,
-                _ => {
-                    let mut result = false;
-                    for role in auth.user_roles(&user_id)?.unwrap_or_default() {
-                        if let Some(ByteCode::Bool(val)) = auth.role_get_attribute(&role, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
-                            result = val;
-                            break;
-                        }
-                    }
-                    result
-                }
-            };
-            Ok(Self {
-                is_admin,
-                ignores_default_api_rules,
-            })
-        }
-        #[cfg(not(feature = "auth"))]
-        const fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, utils::Never> {
-            Ok(Self::UNAUTHED)
-        }
-    }
 
     pub fn index() -> (u16, String) {
         ok!("Welcome to the API!")
     }
     pub async fn current(request: Request, state: &ComponentHandle, element_filter: &SingleFilter<String>, attribute_filter: &SingleFilter<AttributeIdMatcher>) -> (u16, String) {
         use axum::extract::rejection::JsonRejection;
+        #[cfg(feature = "auth")]
         let user = match Json::<api_types::auth::Authentication>::from_request(request, &()).await {
-            Ok(Json(api_types::auth::Authentication { session_id })) => match User::from_session_id(Some(session_id), state) {
+            Ok(Json(api_types::auth::Authentication { session_id })) => match crate::auth::User::from_session_id(Some(session_id), state) {
                 Ok(v) => v,
                 Err(e) => return exception!("auth.internal", e.to_string()),
             },
-            Err(JsonRejection::MissingJsonContentType(_)) => User::UNAUTHED,
+            Err(JsonRejection::MissingJsonContentType(_)) => crate::auth::User::UNAUTHED,
             Err(_e) => return err!(400, "invalid authentication request.")
         };
+        #[cfg(feature = "auth")]
         if user.is_admin || user.ignores_default_api_rules {
-            ok!(api_types::States::from(state.get_states()))
-        } else {
-            ok!(api_types::States::from(state.get_states()
-                .into_iter()
-                .filter(|(id, _)| element_filter.allows(id))
-                .map(|(id, mut state)| {
-                    state.attributes.retain(|id, _| attribute_filter.allows(id));
-                    (id, state)
-                })
-                .collect::<HashMap<_, _>>()
-            ))
+            trace!("user is ignoring rules.");
+            return ok!(api_types::States::from(state.get_states()))
         }
+        ok!(api_types::States::from(state.get_states()
+            .into_iter()
+            .filter(|(id, _)| element_filter.allows(id))
+            .map(|(id, mut state)| {
+                state.attributes.retain(|id, _| attribute_filter.allows(id));
+                (id, state)
+            })
+            .collect::<HashMap<_, _>>()
+        ))
     }
     #[cfg(feature = "history")]
     pub async fn history_attribute(request: Request, state: &ComponentHandle, attribute_filter: &SingleFilter<AttributeIdMatcher>, element_filter: &SingleFilter<String>) -> (u16, String) {
@@ -253,11 +212,20 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing element_id or attribute_id"),
         };
-        let user = match User::from_session_id(args.session_id, state) {
+        #[cfg(feature = "auth")]
+        let user = match crate::auth::User::from_session_id(args.session_id, state) {
             Ok(v) => v,
             Err(e) => return exception!("auth.internal", e.to_string()),
         };
-        if !user.is_admin && !user.ignores_default_api_rules && !element_filter.allows(&args.element_id) || !attribute_filter.allows(&args.attribute_id) {
+
+        if !element_filter.allows(&args.element_id) || !attribute_filter.allows(&args.attribute_id) {
+            #[cfg(feature = "auth")]
+            if user.is_admin || user.ignores_default_api_rules {
+                trace!("user ignoring rules.")
+            } else {
+                return err!(404, "invalid element/attribute id");
+            }
+            #[cfg(not(feature = "auth"))]
             return err!(404, "invalid element/attribute id");
         }
         let history = state.component_map::<crate::History, _, _>(|hist| {
@@ -282,11 +250,19 @@ mod handles {
             Ok(v) => v,
             Err(_e) => return err!(400, "missing element_id"),
         };
-        let user = match User::from_session_id(args.session_id, state) {
+        #[cfg(feature = "auth")]
+        let user = match crate::auth::User::from_session_id(args.session_id, state) {
             Ok(v) => v,
             Err(e) => return exception!("auth.internal", e.to_string()),
         };
-        if !user.is_admin && !user.ignores_default_api_rules && !element_filter.allows(&args.element_id) {
+        if !element_filter.allows(&args.element_id) {
+            #[cfg(feature = "auth")]
+            if user.is_admin || user.ignores_default_api_rules {
+                trace!("user ignoring rules.")
+            } else {
+                return err!(404, "invalid element id");
+            }
+            #[cfg(not(feature = "auth"))]
             return err!(404, "invalid element id");
         }
         let history = state.component_map::<crate::History, _, _>(|hist| {

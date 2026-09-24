@@ -14,6 +14,7 @@ combined!{
                ConfigError: ConfigError,
                AccessError: AccessError,
                LoginError: LoginError> AuthServer {
+        #[config] #[serde(flatten)]
         if "auth-config-backend"(config): config: ConfigAuthBackend,
     }
 }

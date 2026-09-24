@@ -5,7 +5,7 @@ macro_rules! config_struct {
         #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
         $(#[$struct_meta])*
         pub struct Config {
-            $(#[cfg(feature=$feature)] $(#[$field_meta])* pub  $field_name: <$crate::auth::backends::$backend_name as $crate::auth::Backend>::Config,)*
+            $(#[cfg(feature=$feature)] #[serde(default)] $(#[$field_meta])* pub  $field_name: <$crate::auth::backends::$backend_name as $crate::auth::Backend>::Config,)*
         }
     };
 }
@@ -148,25 +148,25 @@ macro_rules! combined {
         $crate::auth::macros::config_struct!(
             $(#[$config_meta])*
             pub struct $config_name {
-                $($(#[$config_field_meta])* if $feature: $config_field: $backend_name,)*
+                $($($(#[$config_field_meta])*)? if $feature: $config_field: $backend_name,)*
             }
         );
         $crate::auth::macros::error_type!(
             $(#[$config_error_meta])*
             pub enum $config_error_name {
-                $($(#[$config_error_field_meta])* if $feature: $backend_name::ConfigError,)*
+                $($($(#[$config_error_field_meta])*)? if $feature: $backend_name::ConfigError,)*
             }
         );
         $crate::auth::macros::error_type!(
             $(#[$access_error_meta])*
             pub enum $access_error_name {
-                $($(#[$access_error_field_meta])* if $feature: $backend_name::AccessError,)*
+                $($($(#[$access_error_field_meta])*)? if $feature: $backend_name::AccessError,)*
             }
         );
         $crate::auth::macros::error_type!(
             $(#[$login_error_meta])*
             pub enum $login_error_name {
-                $($(#[$login_error_field_meta])* if $feature: $backend_name::LoginError,)*
+                $($($(#[$login_error_field_meta])*)? if $feature: $backend_name::LoginError,)*
             }
         );
         $crate::auth::macros::main_struct!(
@@ -176,7 +176,7 @@ macro_rules! combined {
                 config_err: $config_error_name,
                 access_err: $access_error_name,
                 login_err: $login_error_name,
-                $($(#[$main_field_meta])* if $feature($config_field): $main_struct_field_name: $backend_name)*
+                $($($(#[$main_field_meta])*)? if $feature($config_field): $main_struct_field_name: $backend_name)*
             }
         );
     };

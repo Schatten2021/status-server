@@ -84,6 +84,7 @@ fn run_reconfiguration(backend: &Arc<GlobalState>) {
     let mut component_lock = backend.components.write();
     let config = backend.config.read();
     let mut to_remove = HashSet::new();
+    let _ = backend.tokio_handle.enter();
     for (component, info) in component_lock.entries_mut() {
         if config.global.ignored.components.contains(info.id) {
             to_remove.insert(info.type_id);
