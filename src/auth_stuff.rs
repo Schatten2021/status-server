@@ -34,7 +34,7 @@ impl Commands {
                         return Err(());
                     }
                 };
-                println!("{}", hash);
+                println!("{hash}");
             }
         }
         Ok(())
