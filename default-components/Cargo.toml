@@ -8,7 +8,7 @@ edition = "2024"
 filters = []
 # api/web "notifications"
 api = ["filters", "dep:api-types", "dep:serde_json", "dep:axum", "dep:tokio"]
-websockets = ["filters", "dep:api-types", "dep:tokio", "dep:serde_json", "dep:axum", "axum/ws"]
+websockets = ["filters", "dep:api-types", "dep:tokio", "dep:serde_json", "dep:axum", "axum/ws", "dep:futures-util"]
 frontend = ["api", "websockets"]
 # notifications
 ntfy-notifications = ["filters", "dep:url", "dep:tokio", "dep:strfmt", "dep:reqwest"]
@@ -61,6 +61,8 @@ axum = { workspace = true, optional = true }
 # api
 api-types = { workspace = true, features = ["server-support"], optional = true }
 serde_json = { version = "1", optional = true }
+# websocket
+futures-util = { version = "0.3", optional = true }
 
 # NTFY
 url = { version = "2.5", features = ["serde"], optional = true }

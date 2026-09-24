@@ -221,7 +221,7 @@ mod handles {
         if !element_filter.allows(&args.element_id) || !attribute_filter.allows(&args.attribute_id) {
             #[cfg(feature = "auth")]
             if user.is_admin || user.ignores_default_api_rules {
-                trace!("user ignoring rules.")
+                trace!("user ignoring rules.");
             } else {
                 return err!(404, "invalid element/attribute id");
             }
@@ -258,7 +258,7 @@ mod handles {
         if !element_filter.allows(&args.element_id) {
             #[cfg(feature = "auth")]
             if user.is_admin || user.ignores_default_api_rules {
-                trace!("user ignoring rules.")
+                trace!("user ignoring rules.");
             } else {
                 return err!(404, "invalid element id");
             }

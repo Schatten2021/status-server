@@ -26,6 +26,7 @@ extern crate tracing;
 #[macro_use]
 extern crate yew;
 
+use futures_util::SinkExt;
 use gloo_net::websocket::Message;
 use yew::{Context, Html};
 use crate::status::AppState;
@@ -92,6 +93,7 @@ impl yew::Component for App {
     fn update(&mut self, ctx: &Context<Self>, msg: Self::Message) -> bool {
         match msg {
             AppMessage::LoadedInitial(data) => {
+                let session_id = data.session_id.clone();
                 self.state = Some(data);
                 let link = ctx.link().clone();
                 wasm_bindgen_futures::spawn_local(async move {
@@ -108,9 +110,15 @@ impl yew::Component for App {
                         }
                     };
                     let url = format!("{}://{host}/api/ws", if secure { "wss" } else { "ws" });
-                    let mut socket = gloo_net::websocket::futures::WebSocket::open(&url)
+                    let mut websocket = gloo_net::websocket::futures::WebSocket::open(&url)
                         .expect("unable to open websocket");
-                    while let Some(Ok(message)) = socket.next().await {
+                    if let Some(id) = session_id {
+                        match serde_json::to_string(&api_types::websocket::UpstreamMessage::Login(id)) {
+                            Ok(v) => websocket.send(Message::Text(v)).await.expect("unable to send login websocket message."),
+                            Err(e) => error!("couldn't serialize Login Websocket message: {e}"),
+                        }
+                    }
+                    while let Some(Ok(message)) = websocket.next().await {
                         let message = match message {
                             Message::Text(msg) => {
                                 trace!("received message: {msg}");

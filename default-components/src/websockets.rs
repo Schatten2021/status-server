@@ -3,7 +3,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use axum::extract::Request;
+use axum::extract::ws::Message;
 use axum::response::IntoResponse;
+use futures_util::{SinkExt, StreamExt};
 use tokio::sync::{Mutex, RwLock};
 
 use utils::Never;
@@ -39,15 +41,15 @@ impl Default for Config {
 
 
 struct Socket {
-    ws: Mutex<axum::extract::ws::WebSocket>,
+    ws: Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>,
     online: AtomicBool,
     #[cfg(feature = "auth")]
-    user: crate::auth::User,
+    user: RwLock<crate::auth::User>,
 }
 
 /// Provides Websockets at the configured path, sending [`Notification`]s via the Socket.
 pub struct Websockets {
-    sockets: Arc<RwLock<Vec<Socket>>>,
+    sockets: Arc<RwLock<Vec<Arc<Socket>>>>,
     config: Config,
     state: ComponentHandle
 }
@@ -58,7 +60,7 @@ impl server::Component for Websockets {
 
     fn init(state: ComponentHandle, config: Self::Config) -> Result<Self, Self::ConfigError> {
         let config = config.notification;
-        let websockets = Arc::new(RwLock::new(Vec::<Socket>::new()));
+        let websockets = Arc::new(RwLock::new(Vec::<Arc<Socket>>::new()));
         let mut ticker = tokio::time::interval(Duration::from_mins(30));
         let ws = websockets.clone();
         tokio::spawn(async move {
@@ -91,39 +93,49 @@ impl server::Component for Websockets {
                 ws::WebSocketUpgrade,
                 FromRequest,
             };
-            #[cfg(feature = "auth")]
-            let user = match request.headers().get("Authorization") {
-                None => {
-                    trace!("no Authorization header");
-                    crate::auth::User::UNAUTHED
-                },
-                Some(auth) => match auth.to_str().map(ToString::to_string) {
-                    Ok(v) => match crate::auth::User::from_session_id(Some(v), &state) {
-                        Ok(u) => {
-                            trace!("logged in user connecting to websocket: {u:?}");
-                            u
-                        }
-                        Err(e) => {
-                            error!("error accessing user: {e}");
-                            crate::auth::User::UNAUTHED
-                        },
-                    },
-                    Err(e) => {
-                        trace!("invalid authorization header: {e}");
-                        crate::auth::User::UNAUTHED
-                    },
-                }
-            };
             match WebSocketUpgrade::from_request(request, &()).await {
                 Ok(upgrade) => {
                     upgrade.on_upgrade(move |socket| async move {
-                        let socket = Socket {
-                            ws: Mutex::new(socket),
+                        let (sender, mut receiver) = socket.split();
+                        let socket = Arc::new(Socket {
+                            ws: Mutex::new(sender),
                             online: AtomicBool::new(true),
                             #[cfg(feature="auth")]
-                            user,
-                        };
-                        websockets.write().await.push(socket);
+                            user: RwLock::new(crate::auth::User::UNAUTHED),
+                        });
+                        websockets.write().await.push(socket.clone());
+                        tokio::spawn(async move {
+                            while let Some(Ok(msg)) = receiver.next().await {
+                                match msg {
+                                    Message::Text(txt) => {
+                                        let content: api_types::websocket::UpstreamMessage = match serde_json::from_str(txt.as_str()) {
+                                            Ok(v) => v,
+                                            Err(e) => {
+                                                error!("received invalid JSON via websocket: {e}");
+                                                continue
+                                            }
+                                        };
+                                        match content {
+                                            #[cfg(feature = "auth")]
+                                            api_types::websocket::UpstreamMessage::Login(session_id) => {
+                                                let user = match crate::auth::User::from_session_id(Some(session_id), &state) {
+                                                    Ok(u) => u,
+                                                    Err(e) => {
+                                                        error!("error accessing user: {e}");
+                                                        continue;
+                                                    }
+                                                };
+                                                *socket.user.write().await = user;
+                                            }
+                                            #[cfg(not(feature="auth"))]
+                                            api_types::websocket::UpstreamMessage::Login(_) => {}
+                                        }
+                                    }
+                                    _ => continue,
+                                }
+                            }
+                            socket.online.store(false, Ordering::Relaxed);
+                        });
                     })
                 }
                 Err(e) => e.into_response(),
@@ -146,8 +158,9 @@ impl server::NotificationProvider for Websockets {
         tokio::spawn(async move {
             let sockets = sockets;
             for socket in sockets.read().await.iter() {
+                let user = socket.user.read().await;
                 if !socket.online.load(Ordering::Relaxed) ||
-                    !is_allowed && !socket.user.is_admin && !socket.user.ignores_default_api_rules {
+                    !is_allowed && !user.is_admin && !user.ignores_default_api_rules {
                     continue;
                 }
                 let msg = message.clone();

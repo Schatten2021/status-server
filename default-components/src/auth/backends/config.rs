@@ -15,7 +15,7 @@ pub enum Password {
 }
 impl Default for Password {
     fn default() -> Self {
-        Self::Plaintext("".to_string())
+        Self::Plaintext(String::new())
     }
 }
 impl Password {

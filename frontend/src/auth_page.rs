@@ -37,8 +37,8 @@ impl yew::Component for LoginPage {
                     link.send_message(Message::LoginResultReceived(gloo_net::http::Request::post("/api/login")
                         .json(&api_types::auth::LoginRequest { username, password }).expect("unable to serialize Authentication JSON")
                         .send().await.expect("unable to send request to /api/current")
-                        .json().await.expect("unable to read api response from /api/current")))
-                })
+                        .json().await.expect("unable to read api response from /api/current")));
+                });
             }
             Message::LoginResultReceived(response) => match response {
                 api_types::ApiResponse::Ok(api_types::auth::LoginResponse { session_id }) => ctx.props().on_login.emit(session_id),

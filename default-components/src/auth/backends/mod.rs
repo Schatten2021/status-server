@@ -1,7 +1,7 @@
 use rand::distr::SampleString;
 use utils::featured_use;
 use server::ComponentHandle;
-use super::type_defs::*;
+use super::type_defs::{UserId, SessionId, RoleId, AttributeId, AttributeMap};
 
 
 pub const SESSION_ID_LENGTH: usize = 256;
@@ -25,7 +25,7 @@ pub trait Backend: Sized {
             .map(|roles| roles.contains(role)))
     }
     fn user_attributes(&self, user_id: &UserId) -> Result<Option<AttributeMap>, Self::AccessError>;
-    fn user_get_attribute(&self, user_id: &UserId, attribute_id: &String) -> Result<Option<bytecode::ByteCode>, Self::AccessError> {
+    fn user_get_attribute(&self, user_id: &UserId, attribute_id: &AttributeId) -> Result<Option<bytecode::ByteCode>, Self::AccessError> {
         Ok(match self.user_attributes(user_id)? {
             // Note: using remove to move the value out of the map directly so that it doesn't need
             // to be cloned.
@@ -36,7 +36,7 @@ pub trait Backend: Sized {
 
     fn role_users(&self, role_id: &RoleId) -> Result<Vec<UserId>, Self::AccessError>;
     fn role_attributes(&self, role_id: &RoleId) -> Result<Option<AttributeMap>, Self::AccessError>;
-    fn role_get_attribute(&self, role_id: &RoleId, attribute_id: &String) -> Result<Option<bytecode::ByteCode>, Self::AccessError>;
+    fn role_get_attribute(&self, role_id: &RoleId, attribute_id: &AttributeId) -> Result<Option<bytecode::ByteCode>, Self::AccessError>;
 
 }
 

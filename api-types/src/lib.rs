@@ -237,6 +237,13 @@ pub mod websocket {
             }
         }
     }
+    api_type!(
+        /// Messages that can be sent to the server via the websocket.
+        enum UpstreamMessage {
+            /// Represents that the user has logged in with the given session-id.
+            Login(String),
+        }
+    );
 }
 pub mod history {
     //! Types for requesting the History of an element's online-state or attribute.

@@ -97,14 +97,16 @@ impl User {
         is_admin: false,
         ignores_default_api_rules: false,
     };
-    pub fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, crate::auth::AccessError> {
+    pub fn from_session_id(session_id: Option<SessionId>, state: &ComponentHandle) -> Result<Self, AccessError> {
         const IGNORES_SESSION_ATTRIBUTE_ID: &str = "ignores_api_rules";
         use bytecode::ByteCode;
 
         let Some(session_id) = session_id else { return Ok(Self::UNAUTHED); };
-        let Some(auth): Option<crate::Auth> = state.component_map(|opt| opt.cloned()) else { return Ok(Self::UNAUTHED); };
+        #[expect(clippy::redundant_closure_for_method_calls, reason="not using a closure either leads to lifetime problems or to 'multiple items in this scope' problems.")]
+        let Some(auth): Option<Auth> = state.component_map(|opt| opt.cloned()) else { return Ok(Self::UNAUTHED); };
         let Some(user_id) = auth.user_id_from_session(&session_id)? else { return Ok(Self::UNAUTHED); };
         let is_admin = auth.has_role(&user_id, &"admin".to_string())?.unwrap_or(false);
+        #[expect(clippy::single_match_else, reason="using a match here is clearer.")]
         let ignores_default_api_rules = match auth.user_get_attribute(&user_id, &IGNORES_SESSION_ATTRIBUTE_ID.to_string())? {
             Some(ByteCode::Bool(val)) => val,
             _ => {
